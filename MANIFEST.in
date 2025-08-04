@@ -1,0 +1,2 @@
+include conanfile.py CMakeLists.txt
+exclude CMakeUserPresets.json

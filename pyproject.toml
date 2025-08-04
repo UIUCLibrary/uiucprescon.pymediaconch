@@ -1,0 +1,25 @@
+[build-system]
+requires = [
+    "cmake",
+    'pybind11<2.11',
+    'uiucprescon.build @ https://github.com/UIUCLibrary/uiucprescon_build/releases/download/v0.2.7/uiucprescon_build-0.2.7-py3-none-any.whl',
+]
+build-backend = "uiucprescon.build"
+
+[project]
+name = "uiucprescon.pymediaconch"
+version = "0.0.1"
+requires-python = '>=3.9'
+license = "NCSA"
+license-files = ["LICENSE"]
+description = "Python wrapper around mediaconch"
+maintainers = [
+    {name="Henry Borchers", email="hborcher@illinois.edu"}
+]
+authors = [
+    {name="University Library at The University of Illinois at Urbana Champaign: Preservation Services", email="prescons@library.illinois.edu"}
+]
+
+[tool.setuptools]
+packages = ["uiucprescon.pymediaconch"]
+package-dir = {"" = "src"}
