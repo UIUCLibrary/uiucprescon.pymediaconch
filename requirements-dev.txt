@@ -2,6 +2,8 @@
 #    uv pip compile requirements/requirements-dev.txt pyproject.toml --universal --python 3.9
 colorama==0.4.6 ; sys_platform == 'win32'
     # via pytest
+coverage==7.10.2
+    # via -r requirements/requirements-dev.txt
 exceptiongroup==1.3.0 ; python_full_version < '3.11'
     # via pytest
 iniconfig==2.1.0
