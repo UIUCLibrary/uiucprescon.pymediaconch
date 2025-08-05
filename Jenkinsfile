@@ -83,7 +83,13 @@ pipeline {
                             parallel {
                                 stage('Running Unit Tests'){
                                     steps{
-                                        echo 'pytest'
+                                        sh(
+                                            label: 'Running pytest',
+                                            script: '''mkdir -p reports/pytestcoverage
+                                                       . ./venv/bin/activate
+                                                       coverage run --parallel-mode --source=uiucprescon -m pytest --junitxml=./reports/pytest/junit-pytest.xml --basetemp=/tmp/pytest
+                                                       '''
+                                        )
                                     }
                                 }
                             }
