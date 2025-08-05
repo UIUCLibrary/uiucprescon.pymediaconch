@@ -17,9 +17,14 @@ pipeline {
                         dockerfile {
                             filename 'ci/docker/linux/jenkins/Dockerfile'
                             label 'linux && docker && x86'
-        //                     additionalBuildArgs '--build-arg PIP_EXTRA_INDEX_URL --build-arg PIP_INDEX_URL --build-arg PIP_CACHE_DIR=/.cache/pip --build-arg UV_CACHE_DIR=/.cache/uv --build-arg CONAN_CENTER_PROXY_V2_URL'
                             args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'
                         }
+                    }
+                    environment{
+                        PIP_CACHE_DIR='/tmp/pipcache'
+                        UV_TOOL_DIR='/tmp/uvtools'
+                        UV_PYTHON_INSTALL_DIR='/tmp/uvpython'
+                        UV_CACHE_DIR='/tmp/uvcache'
                     }
                     stages{
                         stage('Setup'){
@@ -57,8 +62,19 @@ pipeline {
                                     }
                                 }
                                 stage('Installing project as editable module'){
+                                    options{
+                                        timeout(10)
+                                    }
                                     steps{
-                                       echo 'Building debug build with coverage data'
+                                        sh(
+                                            label: 'Build python package',
+                                            script: '''mkdir -p build/python
+                                                       mkdir -p logs
+                                                       mkdir -p reports
+                                                       . ./venv/bin/activate
+                                                       uv pip install --index-strategy unsafe-best-match --verbose -e .
+                                                       '''
+                                        )
                                     }
                                 }
                             }
