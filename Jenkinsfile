@@ -65,14 +65,18 @@ pipeline {
                                     options{
                                         timeout(10)
                                     }
+                                    environment{
+                                        CXXFLAGS='--coverage -fprofile-filter-files=src/uiucprescon/pymediaconch/.*'
+                                    }
                                     steps{
+                                        // Using python setup.py build_ext because there is no other way to capture coverage data directly through python
                                         sh(
                                             label: 'Build python package',
                                             script: '''mkdir -p build/python
                                                        mkdir -p logs
                                                        mkdir -p reports
                                                        . ./venv/bin/activate
-                                                       uv pip install --index-strategy unsafe-best-match --verbose -e .
+                                                       python setup.py build_ext --inplace
                                                        '''
                                         )
                                     }
@@ -87,10 +91,27 @@ pipeline {
                                             label: 'Running pytest',
                                             script: '''mkdir -p reports/pytestcoverage
                                                        . ./venv/bin/activate
-                                                       coverage run --parallel-mode --source=uiucprescon -m pytest --junitxml=./reports/pytest/junit-pytest.xml --basetemp=/tmp/pytest
+                                                       coverage run --parallel-mode --source=src,tests -m pytest --junitxml=./reports/pytest/junit-pytest.xml --basetemp=/tmp/pytest
                                                        '''
                                         )
                                     }
+                                }
+                            }
+                            post{
+                                always{
+                                    sh(label: 'combining coverage data',
+                                       script: '''mkdir -p reports/coverage
+                                                  . ./venv/bin/activate
+                                                  coverage combine
+                                                  coverage xml -o ./reports/coverage/coverage-python.xml
+                                                  uvx gcovr --root . --print-summary --keep --json -o reports/coverage/coverage_cpp.json build
+                                                  uvx gcovr --add-tracefile reports/coverage/coverage_cpp.json --keep --print-summary --xml -o reports/coverage/coverage_cpp.xml
+                                                  '''
+                                          )
+                                    recordCoverage(tools: [[parser: 'COBERTURA', pattern: 'reports/coverage/*.xml']])
+                                }
+                                cleanup{
+                                    sh "git clean -dfx"
                                 }
                             }
                         }
