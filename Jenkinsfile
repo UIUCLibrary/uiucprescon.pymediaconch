@@ -7,7 +7,10 @@ pipeline {
     stages {
         stage('Building and Testing'){
             when{
-                equals expected: true, actual: params.RUN_CHECKS
+                anyOf{
+                    equals expected: true, actual: params.RUN_CHECKS
+                    equals expected: true, actual: params.TEST_RUN_TOX
+                }
             }
             stages{
                 stage('Code Quality') {
