@@ -2,6 +2,7 @@ pipeline {
     agent none
     parameters {
         booleanParam(name: 'RUN_CHECKS', defaultValue: true, description: 'Run checks on code')
+        booleanParam(name: 'TEST_RUN_TOX', defaultValue: true, description: 'Run Tox Tests')
     }
     stages {
         stage('Building and Testing'){
@@ -112,6 +113,89 @@ pipeline {
                                 }
                                 cleanup{
                                     sh "git clean -dfx"
+                                }
+                            }
+                        }
+                    }
+                }
+                stage('Tox'){
+                    when {
+                       equals expected: true, actual: params.TEST_RUN_TOX
+                    }
+                    parallel{
+                        stage('Linux'){
+                            environment{
+                                PIP_CACHE_DIR='/tmp/pipcache'
+                                UV_INDEX_STRATEGY='unsafe-best-match'
+                                UV_TOOL_DIR='/tmp/uvtools'
+                                UV_PYTHON_INSTALL_DIR='/tmp/uvpython'
+                                UV_CACHE_DIR='/tmp/uvcache'
+                            }
+                            when{
+                                expression {return nodesByLabel('linux && docker').size() > 0}
+                            }
+                            steps{
+                                script{
+                                    def envs = []
+                                    node('docker && linux'){
+                                        try{
+                                            checkout scm
+                                            docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'){
+                                                sh(script: 'python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv')
+                                                envs = sh(
+                                                    label: 'Get tox environments',
+                                                    script: './venv/bin/uvx --quiet --with tox-uv tox list -d --no-desc',
+                                                    returnStdout: true,
+                                                ).trim().split('\n')
+                                            }
+                                        } finally{
+                                            sh "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                        }
+                                    }
+                                    parallel(
+                                        envs.collectEntries{toxEnv ->
+                                            def version = toxEnv.replaceAll(/py(\d)(\d+)/, '$1.$2')
+                                            [
+                                                "Tox Environment: ${toxEnv}",
+                                                {
+                                                    node('docker && linux'){
+                                                        checkout scm
+                                                        def image
+                                                        lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
+                                                            image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_EXTRA_INDEX_URL --build-arg PIP_INDEX_URL .')
+                                                        }
+                                                        try{
+                                                            try{
+                                                                image.inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'){
+                                                                    retry(3){
+                                                                        try{
+                                                                            sh( label: 'Running Tox',
+                                                                                script: """python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv
+                                                                                           venv/bin/uvx --python ${version} --python-preference system --with tox-uv tox run -e ${toxEnv} -vv
+                                                                                        """
+                                                                                )
+                                                                        } finally{
+                                                                            cleanWs(
+                                                                                patterns: [
+                                                                                    [pattern: 'venv/', type: 'INCLUDE'],
+                                                                                    [pattern: '.tox', type: 'INCLUDE'],
+                                                                                    [pattern: '**/__pycache__/', type: 'INCLUDE'],
+                                                                                ]
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                }
+                                                            } finally {
+                                                                sh "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                                            }
+                                                        } finally {
+                                                            sh "docker rmi ${image.id}"
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    )
                                 }
                             }
                         }
