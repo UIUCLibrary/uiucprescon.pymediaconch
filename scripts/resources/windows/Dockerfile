@@ -36,18 +36,18 @@ FROM ${FROM_IMAGE} AS base_builder
 
 SHELL ["powershell", "-Command", "$ErrorActionPreference = 'Stop';"]
 
-COPY ci/docker/windows/msvc/visual_studio_config.json c:/setup/config.vsconfig
-COPY ci/docker/windows/msvc/install_msvc.ps1 c:/scripts/install_msvc.ps1
+COPY scripts/resources/windows/msvc/visual_studio_config.json c:/setup/config.vsconfig
+COPY scripts/resources/windows/msvc/install_msvc.ps1 c:/scripts/install_msvc.ps1
 ARG VS_INSTALL_PATH
 ARG VS_VERSION="2022"
 ARG VS_DevCmdArguments="-arch=amd64"
 ARG VS_DevPowershellArguments='-arch=amd64'
 RUN c:/scripts/install_msvc.ps1 -InstallPath ${Env:VS_INSTALL_PATH} -VSConfigFile c:/setup/config.vsconfig -DevCmdArguments ${Env:VS_DevCmdArguments} -DevPowershellArguments ${Env:VS_DevPowershellArguments} -VSVersion ${Env:VS_VERSION}; `
-    Write-Host "Note: Exporting This layer can take a while."
+    Write-Host "Note: Exporting this layer can take a while."
 
 ARG CHOCOLATEY_SOURCE
 ARG ChocolateyEnvironmentDebug=false
-COPY ci/docker/windows/chocolatey/ c:/choco/
+COPY scripts/resources/windows/chocolatey/ c:/choco/
 RUN Set-ExecutionPolicy Bypass -Scope Process -Force; `
     $chocolateyDownloadUrl = c:/choco/get_latest_chocolatey_url.ps1 -packageRepo $env:CHOCOLATEY_SOURCE; `
     c:/choco/install.ps1 -ChocolateyDownloadUrl $chocolateyDownloadUrl;`
@@ -74,7 +74,7 @@ FROM base_builder AS conan_builder
 ARG CONAN_HOME
 ARG UV_INDEX_URL
 COPY ci/docker/shared/conan/remotes.json ${CONAN_HOME}/remotes.json
-COPY ci/docker/windows/conan/profile.ini ${CONAN_HOME}/profiles/default
+COPY scripts/resources/windows/conan/profile.ini ${CONAN_HOME}/profiles/default
 COPY requirements-dev.txt c:/temp/requirements-dev.txt
 COPY conanfile.py c:/temp/conanfile.py
 ENV UV_CONSTRAINT=c:/temp/requirements-dev.txt

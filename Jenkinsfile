@@ -165,7 +165,7 @@ pipeline {
                                                         checkout scm
                                                         def image
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
-                                                            image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_EXTRA_INDEX_URL --build-arg PIP_INDEX_URL .')
+                                                            image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL .')
                                                         }
                                                         try{
                                                             try{
@@ -211,7 +211,7 @@ pipeline {
                                  PIP_CACHE_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\pipcache'
                                  UV_TOOL_DIR='C:\\Users\\ContainerUser\\Documents\\uvtools'
                                  UV_PYTHON_INSTALL_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\uvpython'
-                                 UV_CACHE_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\uvcache'
+                                 UV_CACHE_DIR='C:\\cache\\uvcache'
                              }
                              steps{
                                  script{
@@ -223,8 +223,8 @@ pipeline {
                                                 .inside("\
                                                     --mount type=volume,source=uv_python_install_dir,target=${env.UV_PYTHON_INSTALL_DIR} \
                                                     --mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} \
-                                                    --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
                                                     "
+//                                                     --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
                                                 ){
                                                  bat(script: 'python -m venv venv && venv\\Scripts\\pip install --disable-pip-version-check uv')
                                                  envs = bat(
@@ -244,12 +244,12 @@ pipeline {
                                                  "Tox Environment: ${toxEnv}",
                                                  {
                                                      node('docker && windows'){
-                                                        def maxRetries = 3
+                                                        def maxRetries = 1
                                                         def image
                                                         checkout scm
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
                                                             retry(maxRetries){
-                                                                image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/windows/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
+                                                                image = docker.build(UUID.randomUUID().toString(), '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
                                                             }
                                                         }
                                                         try{
@@ -258,8 +258,8 @@ pipeline {
                                                                 image.inside("\
                                                                     --mount type=volume,source=uv_python_install_dir,target=${env.UV_PYTHON_INSTALL_DIR} \
                                                                     --mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} \
-                                                                    --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
                                                                     "
+//                                                                     --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
                                                                 ){
                                                                     retry(maxRetries){
                                                                         try{

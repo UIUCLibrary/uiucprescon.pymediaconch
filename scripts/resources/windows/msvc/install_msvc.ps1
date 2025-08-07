@@ -98,9 +98,9 @@ function TestCompileWithPowershell {
     Wait-Process -InputObject $local:testClProcess
     if ($local:testClProcess.ExitCode -ne 0)
     {
-        throw "${$local:command_description} - Failed"
+        throw "${local:command_description} - Failed"
     }
-    Write-Host "${$local:command_description} - Success"
+    Write-Host "${local:command_description} - Success"
 
     Write-Host "Test running hello world"
     $local:testRun = Start-Process -FilePath "${local:binDir}\helloworld_ps.exe" -NoNewWindow -PassThru -Wait
