@@ -72,7 +72,6 @@ RUN Set-ExecutionPolicy Bypass -Scope Process -Force; `
 ## ==============================================================================
 FROM base_builder AS conan_builder
 ARG CONAN_HOME
-ARG UV_EXTRA_INDEX_URL
 ARG UV_INDEX_URL
 COPY ci/docker/shared/conan/remotes.json ${CONAN_HOME}/remotes.json
 COPY ci/docker/windows/conan/profile.ini ${CONAN_HOME}/profiles/default
@@ -105,3 +104,4 @@ ARG CONAN_USER_HOME
 ARG CONAN_HOME
 COPY --from=conan_builder ${CONAN_HOME}/ ${CONAN_HOME}/
 ENV CONAN_USER_HOME=${CONAN_USER_HOME}
+RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
