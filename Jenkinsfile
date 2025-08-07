@@ -144,7 +144,7 @@ pipeline {
                                         try{
                                             checkout scm
                                             docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'){
-                                                sh(script: 'python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv')
+                                                sh(script: 'python -m venv venv && venv/bin/pip install --disable-pip-version-check uv')
                                                 envs = sh(
                                                     label: 'Get tox environments',
                                                     script: './venv/bin/uvx --quiet --with tox-uv tox list -d --no-desc',
@@ -201,6 +201,97 @@ pipeline {
                                     )
                                 }
                             }
+                        }
+                        stage('Windows'){
+                             when{
+                                 expression {return nodesByLabel('windows && docker && x86').size() > 0}
+                             }
+                             environment{
+                                 UV_INDEX_STRATEGY='unsafe-best-match'
+                                 PIP_CACHE_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\pipcache'
+                                 UV_TOOL_DIR='C:\\Users\\ContainerUser\\Documents\\uvtools'
+                                 UV_PYTHON_INSTALL_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\uvpython'
+                                 UV_CACHE_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\uvcache'
+                             }
+                             steps{
+                                 script{
+                                     def envs = []
+                                     node('docker && windows'){
+                                         checkout scm
+                                         try{
+                                            docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python')
+                                                .inside("\
+                                                    --mount type=volume,source=uv_python_install_dir,target=${env.UV_PYTHON_INSTALL_DIR} \
+                                                    --mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} \
+                                                    --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
+                                                    "
+                                                ){
+                                                 bat(script: 'python -m venv venv && venv\\Scripts\\pip install --disable-pip-version-check uv')
+                                                 envs = bat(
+                                                     label: 'Get tox environments',
+                                                     script: '@.\\venv\\Scripts\\uvx --quiet --constraint=requirements-dev.txt --with-requirements requirements-dev.txt --with tox-uv tox list -d --no-desc',
+                                                     returnStdout: true,
+                                                 ).trim().split('\r\n')
+                                            }
+                                         } finally{
+                                             bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                         }
+                                     }
+                                     parallel(
+                                         envs.collectEntries{toxEnv ->
+                                             def version = toxEnv.replaceAll(/py(\d)(\d+)/, '$1.$2')
+                                             [
+                                                 "Tox Environment: ${toxEnv}",
+                                                 {
+                                                     node('docker && windows'){
+                                                        def maxRetries = 3
+                                                        def image
+                                                        checkout scm
+                                                        lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
+                                                            retry(maxRetries){
+                                                                image = docker.build(UUID.randomUUID().toString(), '-f scripts/resources/windows/tox/Dockerfile --build-arg PIP_EXTRA_INDEX_URL --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
+                                                            }
+                                                        }
+                                                        try{
+                                                            try{
+                                                                checkout scm
+                                                                image.inside("\
+                                                                    --mount type=volume,source=uv_python_install_dir,target=${env.UV_PYTHON_INSTALL_DIR} \
+                                                                    --mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} \
+                                                                    --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
+                                                                    "
+                                                                ){
+                                                                    retry(maxRetries){
+                                                                        try{
+                                                                            bat(label: 'Running Tox',
+                                                                                script: """uv python install cpython-${version}
+                                                                                           uvx -p ${version} --constraint=requirements-dev.txt --with tox-uv tox run -e ${toxEnv} --workdir %WORKSPACE_TMP%\\.tox
+                                                                                        """
+                                                                            )
+                                                                        } finally{
+                                                                            cleanWs(
+                                                                                patterns: [
+                                                                                        [pattern: '.tox', type: 'INCLUDE'],
+                                                                                    ],
+                                                                                notFailBuild: true,
+                                                                                deleteDirs: true
+                                                                            )
+                                                                        }
+                                                                    }
+                                                                }
+                                                            } finally {
+                                                                bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                                            }
+                                                        } finally{
+                                                            bat "docker rmi --force --no-prune ${image.id}"
+                                                        }
+                                                     }
+                                                 }
+                                             ]
+                                         }
+                                     )
+                                 }
+                             }
                         }
                     }
                 }

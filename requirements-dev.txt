@@ -4,13 +4,15 @@ certifi==2025.8.3
     # via requests
 charset-normalizer==3.4.2
     # via requests
-cmake==4.0.3
-    # via uiucprescon-build
+cmake==3.31.6
+    # via
+    #   -r requirements/requirements-dev.txt
+    #   uiucprescon-build
 colorama==0.4.6
     # via
     #   conan
     #   pytest
-conan==2.19.1
+conan==2.18.1
     # via uiucprescon-build
 coverage==7.10.2
     # via -r requirements/requirements-dev.txt
