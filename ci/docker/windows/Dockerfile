@@ -96,6 +96,7 @@ RUN uvx --with cmake conan profile detect --exist-ok ; `
 
 # =============================================================================
 FROM base_builder
+RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
 COPY --from=certsgen c:/roots.sst roots.sst
 RUN certutil -addstore -f root roots.sst ; `
     del roots.sst
@@ -104,4 +105,3 @@ ARG CONAN_USER_HOME
 ARG CONAN_HOME
 COPY --from=conan_builder ${CONAN_HOME}/ ${CONAN_HOME}/
 ENV CONAN_USER_HOME=${CONAN_USER_HOME}
-RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name "LongPathsEnabled" -Value 1 -PropertyType DWORD -Force
