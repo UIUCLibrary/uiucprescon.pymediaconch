@@ -1,12 +1,8 @@
 ARG CONAN_USER_HOME=/conan
 ARG CONAN_HOME=${CONAN_USER_HOME}/.conan2
 ARG PIP_CACHE_DIR=/.cache/pip
-ARG PIP_INDEX_URL
-ARG PIP_TRUSTED_HOST
-ARG PIP_EXTRA_INDEX_URL
 ARG UV_CACHE_DIR=/.cache/uv
 ARG UV_INDEX_URL
-ARG UV_EXTRA_INDEX_URL
 
 FROM ubuntu:24.04 AS base
 COPY ci/docker/linux/tox/apt-packages.txt /tmp/apt-packages.txt
@@ -22,9 +18,8 @@ RUN apt-get update && \
 
 
 FROM base AS conan_builder
-ARG CONAN_USER_HOME
+ARG UV_INDEX_URL
 COPY requirements-dev.txt /tmp/requirements/requirements-dev.txt
-
 ARG CONAN_HOME
 COPY ci/docker/shared/conan/remotes.json  ${CONAN_HOME}/remotes.json
 COPY ci/docker/linux/tox/conan/profile.ini ${CONAN_HOME}/profiles/default
@@ -43,13 +38,9 @@ RUN python3 -m venv venv --upgrade-deps && \
 FROM base
 ARG CONAN_USER_HOME
 ARG CONAN_HOME
-ARG PIP_EXTRA_INDEX_URL
-ARG PIP_INDEX_URL
-ARG PIP_TRUSTED_HOST
 
 COPY --from=conan_builder ${CONAN_HOME}/ ${CONAN_HOME}/
 RUN chmod -R 777 ${CONAN_HOME}
-
 
 ARG PIP_CACHE_DIR
 ARG UV_CACHE_DIR

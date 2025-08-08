@@ -6,33 +6,107 @@ library identifier: 'JenkinsPythonHelperLibrary@2024.2.0', retriever: modernSCM(
 def SHARED_PIP_CACHE_VOLUME_NAME = 'pipcache'
 def SUPPORTED_WINDOWS_VERSIONS = ['3.13']
 def SUPPORTED_MAC_VERSIONS = ['3.13']
+def SUPPORTED_LINUX_VERSIONS = ['3.13']
 
 def wheelStashes = []
 
-def installMSVCRuntime(cacheLocation){
-    def cachedFile = "${cacheLocation}\\vc_redist.x64.exe".replaceAll(/\\\\+/, '\\\\')
-    withEnv(
-        [
-            "CACHED_FILE=${cachedFile}",
-            "RUNTIME_DOWNLOAD_URL=https://aka.ms/vs/17/release/vc_redist.x64.exe"
-        ]
-    ){
-        lock("${cachedFile}-${env.NODE_NAME}"){
-            powershell(
-                label: 'Ensuring vc_redist runtime installer is available',
-                script: '''if ([System.IO.File]::Exists("$Env:CACHED_FILE"))
-                           {
-                                Write-Host 'Found installer'
-                           } else {
-                                Write-Host 'No installer found'
-                                Write-Host 'Downloading runtime'
-                                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest "$Env:RUNTIME_DOWNLOAD_URL" -OutFile "$Env:CACHED_FILE"
-                           }
-                        '''
-            )
-        }
-        powershell(label: 'Install VC Runtime', script: 'Start-Process -filepath "$Env:CACHED_FILE" -ArgumentList "/install", "/passive", "/norestart" -Passthru | Wait-Process;')
+def linux_wheels(pythonVersions, testPackages, params, wheelStashes){
+    def selectedArches = []
+    def allValidArches = ['arm64', 'x86_64']
+    if(params.INCLUDE_LINUX_ARM == true){
+        selectedArches << 'arm64'
     }
+    if(params.INCLUDE_LINUX_X86_64 == true){
+        selectedArches << 'x86_64'
+    }
+    parallel([failFast: true] << pythonVersions.collectEntries{ pythonVersion ->
+        def newVersionStage = "Python ${pythonVersion} - Linux"
+        def retryTimes = 3
+        return [
+            "${newVersionStage}": {
+                stage(newVersionStage){
+                    parallel([failFast: true] << allValidArches.collectEntries{ arch ->
+                        def newStage = "Python ${pythonVersion} Linux ${arch} Wheel"
+                        return [
+                            "${newStage}": {
+                                stage(newStage){
+                                    if(selectedArches.contains(arch)){
+                                        withEnv([
+                                            'PIP_CACHE_DIR=/tmp/pipcache',
+                                            'UV_TOOL_DIR=/tmp/uvtools',
+                                            'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
+                                            'UV_CACHE_DIR=/tmp/uvcache',
+                                        ]){
+                                            stage("Build Wheel (${pythonVersion} Linux ${arch})"){
+                                                node("linux && docker && ${arch}"){
+                                                    retry(retryTimes){
+                                                        checkout scm
+                                                        try{
+                                                            sh( script: 'scripts/build_linux_wheels.sh')
+                                                            stash includes: 'dist/*manylinux*.*whl', name: "python${pythonVersion} linux - ${arch} - wheel"
+                                                            wheelStashes << "python${pythonVersion} linux - ${arch} - wheel"
+                                                            archiveArtifacts artifacts: 'dist/*manylinux*.*whl'
+                                                        } finally{
+                                                            sh "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                            def testWheelStageName = "Test Wheel (${pythonVersion} Linux ${arch})"
+                                            stage(testWheelStageName){
+                                                if(testPackages == true){
+                                                    retry(retryTimes){
+                                                        node("docker && linux && ${arch}"){
+                                                            checkout scm
+                                                            unstash "python${pythonVersion} linux - ${arch} - wheel"
+                                                            try{
+                                                                withEnv([
+                                                                    'UV_INDEX_STRATEGY=unsafe-best-match',
+                                                                    "TOX_INSTALL_PKG=${findFiles(glob:'dist/*.whl')[0].path}",
+                                                                    "TOX_ENV=py${pythonVersion.replace('.', '')}"
+                                                                ]){
+                                                                    docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'){
+                                                                        sh(
+                                                                            label: 'Testing with tox',
+                                                                            script: '''python3 -m venv venv
+                                                                                       . ./venv/bin/activate
+                                                                                       trap "rm -rf venv" EXIT
+                                                                                       pip install --disable-pip-version-check uv
+                                                                                       uvx --constraint requirements-dev.txt --with tox-uv tox
+                                                                                       rm -rf .tox
+                                                                                    '''
+                                                                        )
+                                                                    }
+                                                                }
+                                                            } finally {
+                                                                sh "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                                                cleanWs(
+                                                                    patterns: [
+                                                                        [pattern: '.tox/', type: 'INCLUDE'],
+                                                                        [pattern: 'dist/', type: 'INCLUDE'],
+                                                                        [pattern: 'venv/', type: 'INCLUDE'],
+                                                                        [pattern: '**/__pycache__/', type: 'INCLUDE'],
+                                                                        ]
+                                                                )
+                                                            }
+                                                        }
+                                                    }
+                                                } else {
+                                                    Utils.markStageSkippedForConditional(testWheelStageName)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        Utils.markStageSkippedForConditional(newStage)
+                                    }
+                                }
+                            }
+                        ]
+                    })
+                }
+            }
+        ]
+    })
 }
 
 def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
@@ -229,7 +303,7 @@ def windows_wheels(pythonVersions, testPackages, params, wheelStashes, sharedPip
                                             checkout scm
                                             try{
                                                 docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside("--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython --mount source=msvc-runtime,target=c:\\msvc_runtime --mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
-                                                    installMSVCRuntime('c:\\msvc_runtime\\')
+//                                                     installMSVCRuntime('c:\\msvc_runtime\\')
                                                     unstash "python${pythonVersion} windows wheel"
                                                     findFiles(glob: 'dist/*.whl').each{
                                                         bat """python -m pip install --disable-pip-version-check uv
@@ -263,6 +337,8 @@ pipeline {
         booleanParam(name: 'TEST_RUN_TOX', defaultValue: false, description: 'Run Tox Tests')
         booleanParam(name: 'BUILD_PACKAGES', defaultValue: false, description: 'Build Python packages')
         booleanParam(name: 'TEST_PACKAGES', defaultValue: true, description: 'Test Python packages by installing them and running tests on the installed package')
+        booleanParam(name: 'INCLUDE_LINUX_ARM', defaultValue: false, description: 'Include ARM architecture for Linux')
+        booleanParam(name: 'INCLUDE_LINUX_X86_64', defaultValue: true, description: 'Include x86_64 architecture for Linux')
         booleanParam(name: 'INCLUDE_MACOS_ARM', defaultValue: false, description: 'Include ARM(m1) architecture for Mac')
         booleanParam(name: 'INCLUDE_MACOS_X86_64', defaultValue: false, description: 'Include x86_64 architecture for Mac')
         booleanParam(name: 'INCLUDE_WINDOWS_X86_64', defaultValue: false, description: 'Include x86_64 architecture for Windows')
@@ -566,6 +642,17 @@ pipeline {
             }
             failFast true
             parallel{
+                stage('Platform Wheels: Linux'){
+                    when {
+                        anyOf {
+                            equals expected: true, actual: params.INCLUDE_LINUX_X86_64
+                            equals expected: true, actual: params.INCLUDE_LINUX_ARM
+                        }
+                    }
+                    steps{
+                        linux_wheels(SUPPORTED_LINUX_VERSIONS, params.TEST_PACKAGES, params, wheelStashes)
+                    }
+                }
                 stage('Platform Wheels: Mac'){
                     when {
                         anyOf {

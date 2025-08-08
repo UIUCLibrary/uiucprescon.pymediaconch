@@ -79,7 +79,7 @@ function Build-Wheel {
         "-c",
         ${createShallowCopy};`
         "uv build --build-constraints=${containerSourcePath}\requirements-dev.txt --python=${PythonVersion} --wheel --out-dir=${containerWorkingPath}\dist --config-setting=conan_cache=C:/Users/ContainerAdministrator/.conan2;`
-        foreach (`$item in `$(Get-ChildItem -Path $containerSourcePath\dist -Filter `"*.whl`")) {uvx delvewheel repair `$item.FullName --namespace-pkg uiucprescon.pymediaconch --wheel-dir ${containerDistPath}}"
+        foreach (`$item in `$(Get-ChildItem -Path $containerSourcePath\dist -Filter `"*.whl`")) {uvx delvewheel repair `$item.FullName --namespace-pkg uiucprescon.pymediaconch --no-mangle-all --wheel-dir ${containerDistPath}}"
     )
 
     $local:dockerBuildProcess = Start-Process -FilePath $DockerExec -WorkingDirectory $(Get-Item $PSScriptRoot).Parent.FullName -ArgumentList $dockerArgsList -NoNewWindow -PassThru -Wait
