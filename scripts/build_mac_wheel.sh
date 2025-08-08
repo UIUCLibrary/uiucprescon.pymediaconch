@@ -69,14 +69,13 @@ generate_wheel_with_uv(){
 }
 
 print_usage(){
-    echo "Usage: $0 project_root python_version [--help]"
+    echo "Usage: $0 python_version [--help]"
 }
 
 show_help() {
     print_usage
     echo
     echo "Arguments:"
-    echo "  project_root     The root directory of the project."
     echo "  python_version   The version of Python to generate a wheel for."
     echo
     echo "Options:"

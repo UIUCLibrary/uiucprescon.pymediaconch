@@ -57,10 +57,11 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                                     stage(newWheelStage){
                                         if(selectedArches.contains(arch)){
                                             stage("Build Wheel (${pythonVersion} MacOS ${arch})"){
-                                                agent("mac && python${pythonVersion} && ${arch}"){
+                                                node("mac && python${pythonVersion} && ${arch}"){
+                                                    checkout scm
                                                     try{
                                                         timeout(60){
-                                                            sh(label: 'Building wheel', script: "scripts/build_mac_wheel.sh --uv=./venv/bin/uv --python-version=${pythonVersion}")
+                                                            sh(label: 'Building wheel', script: "scripts/build_mac_wheel.sh ${pythonVersion}")
                                                         }
                                                         stash includes: 'dist/*.whl', name: "python${pythonVersion} mac ${arch} wheel"
                                                         wheelStashes << "python${pythonVersion} mac ${arch} wheel"
@@ -72,7 +73,7 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                                             }
                                             if(testPackages == true){
                                                 stage("Test Wheel (${pythonVersion} MacOS ${arch})"){
-                                                    agent("mac && python${pythonVersion} && ${arch}"){
+                                                    node("mac && python${pythonVersion} && ${arch}"){
                                                         checkout scm
                                                         try{
                                                             unstash "python${pythonVersion} mac ${arch} wheel"
@@ -80,16 +81,14 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                                                                 timeout(60){
                                                                     sh(label: 'Running Tox',
                                                                        script: """python${pythonVersion} -m venv venv
-                                                                       ./venv/bin/python -m pip install --disable-pip-version-check --upgrade pip
-                                                                       ./venv/bin/pip install --disable-pip-version-check -r requirements-dev.txt
-                                                                       ./venv/bin/tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')}"""
+                                                                       ./venv/bin/python -m pip install --disable-pip-version-check uv
+                                                                       ./venv/bin/uvx --constraint=requirements-dev.txt --with tox_uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')}"""
                                                                     )
                                                                 }
                                                             }
                                                         } finally {
                                                             sh "${tool(name: 'Default', type: 'git')} clean -dfx"
                                                         }
-
                                                     }
                                                 }
                                             }
@@ -107,8 +106,8 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                             stage('Make Universal2 wheel'){
                                 retry(3){
                                     node("mac && python${pythonVersion}") {
+                                        checkout scm
                                         try{
-                                            checkout scm
                                             unstash "python${pythonVersion} mac arm64 wheel"
                                             unstash "python${pythonVersion} mac x86_64 wheel"
                                             def wheelNames = []
@@ -127,11 +126,9 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                                                )
                                            def fusedWheel = findFiles(excludes: '', glob: 'out/*.whl')[0]
                                            def props = readTOML( file: 'pyproject.toml')['project']
-                                           def universalWheel = "py3exiv2bind-${props.version}-cp${pythonVersion.replace('.','')}-cp${pythonVersion.replace('.','')}-macosx_11_0_universal2.whl"
-                                           sh "mv ${fusedWheel.path} ./dist/${universalWheel}"
+                                           sh "mv ${fusedWheel.path} ./dist/"
                                            stash includes: 'dist/*.whl', name: "python${pythonVersion} mac-universal2 wheel"
                                            wheelStashes << "python${pythonVersion} mac-universal2 wheel"
-                                           archiveArtifacts artifacts: 'dist/*.whl'
                                         } finally{
                                             sh "${tool(name: 'Default', type: 'git')} clean -dfx"
                                         }
@@ -143,42 +140,43 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                                     def archStages = [:]
                                     ['x86_64', 'arm64'].each{arch ->
                                         archStages["Test Python ${pythonVersion} universal2 Wheel on ${arch} mac"] = {
-                                            testPythonPkg(
-                                                agent: [
-                                                    label: "mac && python${pythonVersion} && ${arch}",
-                                                ],
-                                                testSetup: {
-                                                    checkout scm
-                                                    unstash "python${pythonVersion} mac-universal2 wheel"
-                                                },
-                                                retries: 3,
-                                                testCommand: {
-                                                    findFiles(glob: 'dist/*.whl').each{
-                                                        withEnv(['UV_INDEX_STRATEGY=unsafe-best-match']){
-                                                            sh(label: 'Running Tox',
-                                                               script: """python${pythonVersion} -m venv venv
-                                                                          trap "rm -rf venv" EXIT
-                                                                          ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                          trap "rm -rf venv && rm -rf .tox" EXIT
-                                                                          ./venv/bin/uvx --python=${pythonVersion} --constraint=requirements-dev.txt --with tox-uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')}
-                                                                       """
-                                                            )
+                                            node("mac && python${pythonVersion}") {
+                                                checkout scm
+                                                retry(3){
+                                                    try{
+                                                        unstash "python${pythonVersion} mac-universal2 wheel"
+                                                        findFiles(glob: 'dist/*.whl').each{
+                                                            withEnv(['UV_INDEX_STRATEGY=unsafe-best-match']){
+                                                                sh(label: 'Running Tox',
+                                                                   script: """python${pythonVersion} -m venv venv
+                                                                              trap "rm -rf venv" EXIT
+                                                                              ./venv/bin/python -m pip install --disable-pip-version-check uv
+                                                                              trap "rm -rf venv && rm -rf .tox" EXIT
+                                                                              ./venv/bin/uvx --python=${pythonVersion} --constraint=requirements-dev.txt --with tox-uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')}
+                                                                           """
+                                                                )
+                                                            }
                                                         }
-                                                    }
-                                                },
-                                                post:[
-                                                    cleanup: {
+                                                    } finally {
                                                         sh "${tool(name: 'Default', type: 'git')} clean -dfx"
-                                                    },
-                                                    success: {
-                                                         archiveArtifacts artifacts: 'dist/*.whl'
                                                     }
-                                                ]
-                                            )
+                                                }
+                                            }
                                         }
                                     }
                                     parallel(archStages)
                                 }
+                            }
+                            node(){
+                                unstash "python${pythonVersion} mac-universal2 wheel"
+                                archiveArtifacts artifacts: 'dist/*.whl'
+                                cleanWs(
+                                    patterns: [
+                                            [pattern: 'dist/', type: 'INCLUDE'],
+                                        ],
+                                    notFailBuild: true,
+                                    deleteDirs: true
+                                )
                             }
                         }
                     }
