@@ -33,13 +33,13 @@ function TestCompileWithCmd {
     $local:command_description = 'Testing compile hello world in cmd'
 
     $local:tempDir = Join-Path $([System.IO.Path]::GetTempPath()) $((New-Guid).ToString("N"))
-    New-Item -ItemType Directory -Path $local:tempDir
+    New-Item -ItemType Directory -Path $local:tempDir | Out-Null
 
     $local:buildDir = Join-Path $local:tempDir "build"
-    New-Item -ItemType Directory -Path $local:buildDir
+    New-Item -ItemType Directory -Path $local:buildDir | Out-Null
 
     $local:binDir = Join-Path $local:tempDir "bin"
-    New-Item -ItemType Directory -Path $local:binDir
+    New-Item -ItemType Directory -Path $local:binDir | Out-Null
 
     Write-Host "Testing compile hello world in cmd"
 
@@ -60,7 +60,7 @@ function TestCompileWithCmd {
     Write-Host "${$local:command_description} - Success"
 
     Write-Host "Test running hello world"
-    $local:testRun = Start-Process -FilePath "${local:binDir}\helloworld_cmd.exe" -NoNewWindow -PassThru -Wait
+    $local:testRun = Start-Process -FilePath "${local:binDir}\helloworld_cmd.exe" -NoNewWindow -PassThru -RedirectStandardOutput "NUL" -Wait
     if ($local:testRun.ExitCode -ne 0)
     {
         throw "Test running hello world - Failed"
@@ -76,13 +76,13 @@ function TestCompileWithPowershell {
     $local:command_description = 'Testing compile hello world in powershell'
 
     $local:tempDir = Join-Path $([System.IO.Path]::GetTempPath()) $((New-Guid).ToString("N"))
-    New-Item -ItemType Directory -Path $local:tempDir
+    New-Item -ItemType Directory -Path $local:tempDir | Out-Null
 
     $local:buildDir = Join-Path $local:tempDir "build"
-    New-Item -ItemType Directory -Path $local:buildDir
+    New-Item -ItemType Directory -Path $local:buildDir | Out-Null
 
     $local:binDir = Join-Path $local:tempDir "bin"
-    New-Item -ItemType Directory -Path $local:binDir
+    New-Item -ItemType Directory -Path $local:binDir | Out-Null
 
     Write-Host "Testing compile hello world in cmd"
 
@@ -103,7 +103,7 @@ function TestCompileWithPowershell {
     Write-Host "${local:command_description} - Success"
 
     Write-Host "Test running hello world"
-    $local:testRun = Start-Process -FilePath "${local:binDir}\helloworld_ps.exe" -NoNewWindow -PassThru -Wait
+    $local:testRun = Start-Process -FilePath "${local:binDir}\helloworld_ps.exe" -NoNewWindow -PassThru -RedirectStandardOutput "NUL" -Wait
     if ($local:testRun.ExitCode -ne 0)
     {
         throw "Test running hello world - Failed"
@@ -329,7 +329,7 @@ function AddStartupScripts{
 
     $newDirPath = Join-Path $([System.IO.Path]::GetTempPath()) $((New-Guid).ToString("N"))
     $sourceFile = Join-Path $newDirPath "helloworld.cpp"
-    New-Item -ItemType Directory -Path $newDirPath
+    New-Item -ItemType Directory -Path $newDirPath | Out-Null
     CreateHelloWorldSource -Location $sourceFile
     TestCompileWithCmd -SampleFile $sourceFile
     Write-Host "Setting up compiler environment to run every time a command is run from CMD - Done"
