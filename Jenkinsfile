@@ -1,8 +1,19 @@
+import org.jenkinsci.plugins.pipeline.modeldefinition.Utils
+library identifier: 'JenkinsPythonHelperLibrary@2024.2.0', retriever: modernSCM(
+  [$class: 'GitSCMSource',
+   remote: 'https://github.com/UIUCLibrary/JenkinsPythonHelperLibrary.git',
+   ])
+
+def SUPPORTED_WINDOWS_VERSIONS = ['3.13']
+
 pipeline {
     agent none
     parameters {
         booleanParam(name: 'RUN_CHECKS', defaultValue: true, description: 'Run checks on code')
-        booleanParam(name: 'TEST_RUN_TOX', defaultValue: true, description: 'Run Tox Tests')
+        booleanParam(name: 'TEST_RUN_TOX', defaultValue: false, description: 'Run Tox Tests')
+        booleanParam(name: 'BUILD_PACKAGES', defaultValue: false, description: 'Build Python packages')
+        booleanParam(name: 'TEST_PACKAGES', defaultValue: true, description: 'Test Python packages by installing them and running tests on the installed package')
+        booleanParam(name: 'INCLUDE_WINDOWS_X86_64', defaultValue: false, description: 'Include x86_64 architecture for Windows')
     }
     stages {
         stage('Building and Testing'){
@@ -224,7 +235,7 @@ pipeline {
                                                     --mount type=volume,source=uv_python_install_dir,target=${env.UV_PYTHON_INSTALL_DIR} \
                                                     --mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} \
                                                     "
-//                                                     --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
+                                                    // --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
                                                 ){
                                                  bat(script: 'python -m venv venv && venv\\Scripts\\pip install --disable-pip-version-check uv')
                                                  envs = bat(
@@ -259,7 +270,7 @@ pipeline {
                                                                     --mount type=volume,source=uv_python_install_dir,target=${env.UV_PYTHON_INSTALL_DIR} \
                                                                     --mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} \
                                                                     "
-//                                                                     --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
+                                                                    // --mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}\
                                                                 ){
                                                                     retry(maxRetries){
                                                                         try{
@@ -297,5 +308,20 @@ pipeline {
                 }
             }
         }
+        stage('Python Packaging'){
+            when{
+                equals expected: true, actual: params.BUILD_PACKAGES
+            }
+            failFast true
+            parallel{
+                stage('Platform Wheels: Windows'){
+                    when {
+                        equals expected: true, actual: params.INCLUDE_WINDOWS_X86_64
+                    }
+                    steps{
+                        echo 'windows_wheels(SUPPORTED_WINDOWS_VERSIONS, params.TEST_PACKAGES, params, wheelStashes, SHARED_PIP_CACHE_VOLUME_NAME)'
+                    }
+                }
+            }
     }
 }
