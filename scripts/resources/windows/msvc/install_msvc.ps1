@@ -340,6 +340,8 @@ function AddStartupScripts{
     TestCompileWithPowershell -SampleFile $sourceFile
     Write-Host "Adding setup Visual Studio development environment scripts to Powershell Profile - Done"
 
+    Remove-Item -Path $local:newDirPath -Recurse
+
 }
 
 # ========== Main ==========
