@@ -3,8 +3,108 @@ library identifier: 'JenkinsPythonHelperLibrary@2024.2.0', retriever: modernSCM(
   [$class: 'GitSCMSource',
    remote: 'https://github.com/UIUCLibrary/JenkinsPythonHelperLibrary.git',
    ])
-
+def SHARED_PIP_CACHE_VOLUME_NAME = 'pipcache'
 def SUPPORTED_WINDOWS_VERSIONS = ['3.13']
+
+def wheelStashes = []
+
+def installMSVCRuntime(cacheLocation){
+    def cachedFile = "${cacheLocation}\\vc_redist.x64.exe".replaceAll(/\\\\+/, '\\\\')
+    withEnv(
+        [
+            "CACHED_FILE=${cachedFile}",
+            "RUNTIME_DOWNLOAD_URL=https://aka.ms/vs/17/release/vc_redist.x64.exe"
+        ]
+    ){
+        lock("${cachedFile}-${env.NODE_NAME}"){
+            powershell(
+                label: 'Ensuring vc_redist runtime installer is available',
+                script: '''if ([System.IO.File]::Exists("$Env:CACHED_FILE"))
+                           {
+                                Write-Host 'Found installer'
+                           } else {
+                                Write-Host 'No installer found'
+                                Write-Host 'Downloading runtime'
+                                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;Invoke-WebRequest "$Env:RUNTIME_DOWNLOAD_URL" -OutFile "$Env:CACHED_FILE"
+                           }
+                        '''
+            )
+        }
+        powershell(label: 'Install VC Runtime', script: 'Start-Process -filepath "$Env:CACHED_FILE" -ArgumentList "/install", "/passive", "/norestart" -Passthru | Wait-Process;')
+    }
+}
+
+
+def windows_wheels(pythonVersions, testPackages, params, wheelStashes, sharedPipCacheVolumeName){
+    parallel([failFast: true] << pythonVersions.collectEntries{ pythonVersion ->
+        def newStage = "Python ${pythonVersion} - Windows"
+        [
+            "${newStage}": {
+                stage(newStage){
+                    if(params.INCLUDE_WINDOWS_X86_64 == true){
+                        stage("Build Wheel (${pythonVersion} Windows)"){
+                            node('windows && docker && x86_64'){
+                                def dockerImageName = "${currentBuild.fullProjectName}_${UUID.randomUUID().toString()}".replaceAll("-", "_").replaceAll('/', "_").replaceAll(' ', "").toLowerCase()
+                                try{
+                                    checkout scm
+                                    try{
+                                        powershell(label: 'Building Wheel for Windows', script: "scripts/build_windows.ps1 -PythonVersion ${pythonVersion} -DockerImageName ${dockerImageName}")
+                                        stash includes: 'dist/*.whl', name: "python${pythonVersion} windows wheel"
+                                        wheelStashes << "python${pythonVersion} windows wheel"
+                                        archiveArtifacts artifacts: 'dist/*.whl'
+                                    } finally {
+                                        bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                    }
+                                } finally {
+                                    powershell(
+                                        label: "Untagging Docker Image used",
+                                        script: "docker image rm --no-prune ${dockerImageName}",
+                                        returnStatus: true
+                                    )
+                                }
+                            }
+                        }
+                        def wheelTestingStageName = "Test Wheel (${pythonVersion} Windows)"
+                        stage(wheelTestingStageName){
+                            if(testPackages == true){
+                                retry(2){
+                                    node('windows && docker'){
+                                        checkout scm
+                                        try{
+                                            withEnv([
+                                                'PIP_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\pipcache',
+                                                'UV_TOOL_DIR=C:\\Users\\ContainerUser\\Documents\\uvtools',
+                                                'UV_PYTHON_INSTALL_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
+                                                'UV_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvcache',
+                                                'UV_INDEX_STRATEGY=unsafe-best-match',
+                                            ]){
+                                                docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside("--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython --mount source=msvc-runtime,target=c:\\msvc_runtime --mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
+                                                    installMSVCRuntime('c:\\msvc_runtime\\')
+                                                    unstash "python${pythonVersion} windows wheel"
+                                                    findFiles(glob: 'dist/*.whl').each{
+                                                        bat """python -m pip install --disable-pip-version-check uv
+                                                               uvx -p ${pythonVersion} --constraint requirements-dev.txt --with tox-uv tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
+                                                            """
+                                                    }
+                                                }
+                                            }
+                                        } finally {
+                                            bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                        }
+                                    }
+                                }
+                            } else {
+                                Utils.markStageSkippedForConditional(wheelTestingStageName)
+                            }
+                        }
+                    } else {
+                        Utils.markStageSkippedForConditional(newStage)
+                    }
+                }
+            }
+        ]
+    })
+}
 
 pipeline {
     agent none
@@ -319,7 +419,7 @@ pipeline {
                         equals expected: true, actual: params.INCLUDE_WINDOWS_X86_64
                     }
                     steps{
-                        echo 'windows_wheels(SUPPORTED_WINDOWS_VERSIONS, params.TEST_PACKAGES, params, wheelStashes, SHARED_PIP_CACHE_VOLUME_NAME)'
+                        windows_wheels(SUPPORTED_WINDOWS_VERSIONS, params.TEST_PACKAGES, params, wheelStashes, SHARED_PIP_CACHE_VOLUME_NAME)
                     }
                 }
             }
