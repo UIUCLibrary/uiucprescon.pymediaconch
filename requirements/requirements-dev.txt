@@ -1,1 +1,6 @@
+cmake<4.0
+coverage
 pytest
+pybind11<2.11
+setuptools
+uiucprescon.build @ https://github.com/UIUCLibrary/uiucprescon_build/releases/download/v0.2.7/uiucprescon_build-0.2.7-py3-none-any.whl
