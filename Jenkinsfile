@@ -509,7 +509,7 @@ pipeline {
                                             [
                                                 "Tox Environment: ${toxEnv}",
                                                 {
-                                                    node('docker && linux'){
+                                                    node('docker && linux && x86_64'){
                                                         checkout scm
                                                         def image
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
