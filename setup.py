@@ -122,6 +122,7 @@ def configure_pymediaconch(builder, ext):
         f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}" if toolchain_file else "",
         f"-DFETCHCONTENT_BASE_DIR={cmake_fetchcontent_base_dir}",
         f'-DCMAKE_INSTALL_PREFIX={installed_prefix}',
+        f'-DCMAKE_POSITION_INDEPENDENT_CODE=true',
         "-B", build_dir,
         f"-DCMAKE_BUILD_TYPE={'Debug' if builder.debug else 'Release'}"
     ]
