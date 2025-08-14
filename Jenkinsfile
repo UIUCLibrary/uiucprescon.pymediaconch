@@ -513,7 +513,7 @@ pipeline {
                                                         checkout scm
                                                         def image
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
-                                                            image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL .')
+                                                            image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL .')
                                                         }
                                                         try{
                                                             try{
@@ -847,7 +847,7 @@ pipeline {
                                                                     try{
                                                                         checkout scm
                                                                         lock("docker build-${env.NODE_NAME}"){
-                                                                            dockerImage = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL .')
+                                                                            dockerImage = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL .')
                                                                         }
                                                                         withEnv([
                                                                             'PIP_CACHE_DIR=/tmp/pipcache',
