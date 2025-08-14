@@ -122,6 +122,7 @@ def configure_pymediaconch(builder, ext):
         f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}" if toolchain_file else "",
         f"-DFETCHCONTENT_BASE_DIR={cmake_fetchcontent_base_dir}",
         f'-DCMAKE_INSTALL_PREFIX={installed_prefix}',
+        f'-DCMAKE_POSITION_INDEPENDENT_CODE=true',
         "-B", build_dir,
         f"-DCMAKE_BUILD_TYPE={'Debug' if builder.debug else 'Release'}"
     ]
@@ -166,6 +167,20 @@ def configure_pymediaconch(builder, ext):
             # ole32 is needed because CoTaskMemFree() is called in Core::get_local_config_path() in Core.cpp
             "ole32",
         ]
+    # Remove the overlap
+    libs = []
+    for lib in ext.libraries:
+        if lib in libs:
+            continue
+        libs.append(lib)
+    ext.libraries = libs
+
+    include_dirs = []
+    for include_dir in ext.include_dirs:
+        if include_dir in include_dirs:
+            continue
+        include_dirs.append(include_dir)
+    ext.include_dirs = include_dirs
 
 
 class BuildExtension(BuildPybind11Extension):
@@ -209,7 +224,7 @@ setup(
         Pybind11Extension(
             name=MEDIACONCH_EXTENSION,
             sources=["src/uiucprescon/pymediaconch/pymediaconch.cpp"],
-            libraries=["mediainfo"],
+            libraries=['mediaconch'],
             cxx_std=11,
         ),
     ],
