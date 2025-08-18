@@ -133,8 +133,6 @@ function TestInstalledProperty {
     Write-Host "Testing for VsDevCmd.bat - Found"
 
     Write-Host "Finished installing Visual Studio Build Tools"
-
-
 }
 
 function RemoveApplications {
@@ -320,8 +318,6 @@ function AddStartupScripts{
         [string]$DevCmdArguments = '-arch=amd64'
     )
     Write-Host "Configuring Visual Studio development environment for shells"
-
-
 
     # ========== Cmd startup ==========
     Write-Host "Setting up compiler environment to run every time a command is run from CMD"
