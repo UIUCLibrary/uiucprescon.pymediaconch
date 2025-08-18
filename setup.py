@@ -132,7 +132,7 @@ def configure_pymediaconch(builder, ext):
         raise ValueError(f"cmake command failed during config. Used command: {' '.join(config_cmd)}") from e
     build_cmd = [
         cmake_exec,
-        "--build", os.path.abspath(build_dir),
+        "--build", build_dir,
         "--target", "MediaConchLib",
         "--config", "Debug" if builder.debug else "Release",
     ]
@@ -143,7 +143,7 @@ def configure_pymediaconch(builder, ext):
 
     install_command = [
         cmake_exec,
-        "--build", os.path.abspath(build_dir),
+        "--build", build_dir,
         "--config", "Debug" if builder.debug else "Release",
         "--target", "install"
     ]
