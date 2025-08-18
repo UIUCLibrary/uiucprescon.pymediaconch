@@ -1,33 +1,14 @@
 #!/usr/bin/env bash
 
 set -e
+
 scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
 PROJECT_ROOT=$(realpath "$scriptDir/..")
-DEFAULT_PYTHON_VERSION="3.10"
+DEFAULT_PYTHON_VERSION="3.13"
 DOCKERFILE=$(realpath "$scriptDir/resources/package_for_linux/Dockerfile")
 DEFAULT_DOCKER_IMAGE_NAME="pymediaconch_builder"
 OUTPUT_PATH="$PROJECT_ROOT/dist"
 DEFAULT_BUILD_CONSTRAINTS="requirements-dev.txt"
-
-SKIP_DIRS_NAMED=(\
-    'venv' \
-    '.tox' \
-    '.git' \
-    '.idea' \
-    'reports' \
-    '.mypy_cache' \
-    '__pycache__' \
-    'wheelhouse' \
-    'ci' \
-    '.pytest_cache' \
-    'pyMediaConch.egg-info'\
-    'uiucprescon.pymediaconch.egg-info'\
-    'build' \
-)
-REMOVE_FILES_FIRST=(\
-  'CMakeUserPresets.json'
-  'conan.lock'
-  )
 
 arch=$(uname -m)
 
@@ -52,7 +33,7 @@ generate_wheel(){
 
     case $platform in
         linux/amd64)
-            manylinux_image=quay.io/pypa/manylinux_2_28_x86_64
+            manylinux_image=quay.io/pypa/manylinux2014_x86_64
             ;;
         linux/arm64)
             manylinux_image=quay.io/pypa/manylinux_2_28_aarch64
@@ -76,61 +57,20 @@ generate_wheel(){
         "$PROJECT_ROOT"
 
     mkdir -p "$OUTPUT_PATH"
-    echo "Building wheels for Python versions: ${python_versions_to_use[*]}"
-    CONTAINER_WORKSPACE=/tmp/workspace
 
-    COMMAND="echo 'Making a shadow copy to prevent modifying local files' && \
-            prune_expr=() && \
-            for name in "${SKIP_DIRS_NAMED[@]}"; do \
-                prune_expr+=(-name \"\$name\" -type d -prune -o); \
-            done && \
-            mkdir -p ${CONTAINER_WORKSPACE} && \
-            (cd /project/ && \
-            find . \"\${prune_expr[@]}\" -type d -print | while read -r dir; do \
-                mkdir -p \"${CONTAINER_WORKSPACE}/\$dir\"
-            done && \
-            find . \"\${prune_expr[@]}\" \( -type f -o -type l \) -print | while read -r file; do \
-                echo \"\$file\"
-                ln -sf "/project/\$file" \"${CONTAINER_WORKSPACE}/\$file\"
-            done) && \
-            for f in "${REMOVE_FILES_FIRST[@]}"; do
-                OFFENDING_FILE=${CONTAINER_WORKSPACE}/\$f
-                if [ -f \"\$OFFENDING_FILE\" ]; then
-                  echo \"Removing copy from temporary working path to avoid issues: \$OFFENDING_FILE\";
-                  rm \$OFFENDING_FILE;
-                fi; \
-            done && \
-            echo 'Removing Python cache files' && \
-            find ${CONTAINER_WORKSPACE} -type d -name '__pycache__' -exec rm -rf {} + && \
-            find ${CONTAINER_WORKSPACE} -type f -name '*.pyc' -exec rm -f {} + && \
-            for i in "${python_versions_to_use[@]}"; do
-                echo \"Creating wheel for Python version: \$i\";
-                uv build --python=\$i --python-preference=system --wheel --out-dir=/tmp/dist ${CONTAINER_WORKSPACE};
-                if [ \$? -ne 0 ]; then
-                  echo \"Failed to build wheel for Python \$i\";
-                  exit 1;
-                fi; \
-            done && \
-            echo 'Fixing up wheels' && \
-            auditwheel -v repair /tmp/dist/*.whl -w /dist/;
-            for file in /dist/*manylinux*.whl; do
-                auditwheel show \$file
-            done && \
-            echo 'Done'
-            "
+    # shellcheck disable=SC2086
     docker run --rm \
         --platform=$platform \
-        -v "$PROJECT_ROOT":/project:ro \
+        -v "$PROJECT_ROOT":/src:ro \
         -v $OUTPUT_PATH:/dist \
-        --entrypoint="/bin/bash" \
         $docker_image_name_to_use \
-        -c "$COMMAND"
+        build-wheel /src /dist ${python_versions_to_use[*]}
     echo "Built wheel can be found in '$OUTPUT_PATH'"
 }
 print_usage(){
     echo "Usage: $0 [--project-root[=PROJECT_ROOT]] [--python-version[=PYTHON_VERSION]] [--help]"
 }
-#
+
 show_help() {
   print_usage
   echo
@@ -278,4 +218,4 @@ else
   echo "Using '$build_constraints_file' for constraints file."
 fi
 check_args
-generate_wheel $PLATFORM $docker_image_name $build_constraints_file ${python_versions[@]}
+generate_wheel $PLATFORM $docker_image_name $build_constraints_file "${python_versions[@]}"
