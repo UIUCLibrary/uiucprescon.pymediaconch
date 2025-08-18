@@ -88,7 +88,6 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
 # ==============================================================================
 
 FROM base
-
 ARG CONAN_USER_HOME
 ARG CONAN_HOME
 COPY --from=conan_builder ${CONAN_HOME}/ ${CONAN_HOME}/
@@ -103,3 +102,8 @@ RUN chmod -R 777 ${CONAN_USER_HOME} && \
     chmod -R 777 ${PIP_CACHE_DIR} && \
     mkdir -p ${UV_CACHE_DIR} && \
     chmod -R 777 ${UV_CACHE_DIR}
+
+
+COPY scripts/resources/package_for_linux/build-wheel.sh /usr/bin/build-wheel
+RUN  chmod +x /usr/bin/build-wheel
+CMD ["build-wheel", "--help"]
