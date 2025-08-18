@@ -19,8 +19,7 @@ SKIP_DIRS_NAMED=(\
     'pyMediaConch.egg-info'\
     'uiucprescon.pymediaconch.egg-info'\
     'build' \
-    )
-
+)
 REMOVE_FILES_FIRST=(\
   'CMakeUserPresets.json'
   'conan.lock'
