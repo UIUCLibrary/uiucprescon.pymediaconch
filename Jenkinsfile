@@ -3,21 +3,38 @@ library identifier: 'JenkinsPythonHelperLibrary@2024.2.0', retriever: modernSCM(
   [$class: 'GitSCMSource',
    remote: 'https://github.com/UIUCLibrary/JenkinsPythonHelperLibrary.git',
    ])
+
+def PYPI_CONFIG_ID = 'pypi_config'
+
 def SHARED_PIP_CACHE_VOLUME_NAME = 'pipcache'
+
 def SUPPORTED_WINDOWS_VERSIONS = [
-//     '3.12',
+    '3.12',
     '3.13'
 ]
 def SUPPORTED_MAC_VERSIONS = [
-//     '3.12',
+    '3.12',
     '3.13'
 ]
 def SUPPORTED_LINUX_VERSIONS = [
-//     '3.12',
+    '3.12',
     '3.13'
 ]
 
 def wheelStashes = []
+
+def getPypiConfig(pypiConfigId) {
+    node(){
+        try{
+            configFileProvider([configFile(fileId: pypiConfigId, variable: 'CONFIG_FILE')]) {
+                def config = readJSON( file: CONFIG_FILE)
+                return config['deployment']['indexes']
+            }
+        } catch(e){
+            return []
+        }
+    }
+}
 
 def linux_wheels(pythonVersions, testPackages, params, wheelStashes){
     def selectedArches = []
@@ -279,7 +296,22 @@ def windows_wheels(pythonVersions, testPackages, params, wheelStashes, sharedPip
                                 try{
                                     checkout scm
                                     try{
-                                        powershell(label: 'Building Wheel for Windows', script: "scripts/build_windows.ps1 -PythonVersion ${pythonVersion} -DockerImageName ${dockerImageName}")
+                                        retry(3){
+                                            try{
+                                                powershell(label: 'Building Wheel for Windows', script: "scripts/build_windows.ps1 -PythonVersion ${pythonVersion} -DockerImageName ${dockerImageName}")
+                                            } catch(e){
+                                                cleanWs(
+                                                    patterns: [
+                                                        [pattern: 'dist/', type: 'INCLUDE'],
+                                                        [pattern: 'build/', type: 'INCLUDE'],
+                                                        [pattern: '**/__pycache__/', type: 'INCLUDE'],
+                                                    ],
+                                                    notFailBuild: true,
+                                                    deleteDirs: true
+                                                )
+                                                throw e
+                                            }
+                                        }
                                         stash includes: 'dist/*.whl', name: "python${pythonVersion} windows wheel"
                                         wheelStashes << "python${pythonVersion} windows wheel"
                                         archiveArtifacts artifacts: 'dist/*.whl'
@@ -350,6 +382,7 @@ pipeline {
         booleanParam(name: 'INCLUDE_MACOS_ARM', defaultValue: false, description: 'Include ARM(m1) architecture for Mac')
         booleanParam(name: 'INCLUDE_MACOS_X86_64', defaultValue: false, description: 'Include x86_64 architecture for Mac')
         booleanParam(name: 'INCLUDE_WINDOWS_X86_64', defaultValue: false, description: 'Include x86_64 architecture for Windows')
+        booleanParam(name: 'DEPLOY_PYPI', defaultValue: false, description: 'Deploy to pypi')
     }
     stages {
         stage('Building and Testing'){
@@ -590,7 +623,7 @@ pipeline {
                                                  "Tox Environment: ${toxEnv}",
                                                  {
                                                      node('docker && windows'){
-                                                        def maxRetries = 1
+                                                        def maxRetries = 3
                                                         def image
                                                         checkout scm
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
@@ -645,6 +678,9 @@ pipeline {
             when{
                 equals expected: true, actual: params.BUILD_PACKAGES
             }
+            environment{
+                UV_BUILD_CONSTRAINT='requirements-dev.txt'
+            }
             failFast true
             parallel{
                 stage('Platform Wheels: Linux'){
@@ -691,20 +727,26 @@ pipeline {
                                 PIP_CACHE_DIR='/tmp/pipcache'
                                 UV_INDEX_STRATEGY='unsafe-best-match'
                                 UV_CACHE_DIR='/tmp/uvcache'
+                                UV_TOOL_DIR='/tmp/uvtools'
+                                UV_CONSTRAINT='requirements-dev.txt'
                             }
                             steps{
                                 script{
                                     try{
                                         sh(
+                                            label: 'Setting up uv',
+                                            script: 'python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv'
+                                        )
+                                        sh(
                                             label: 'Package',
-                                            script: '''python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv
-                                                       trap "rm -rf venv" EXIT
-                                                       ./venv/bin/uv build --build-constraints requirements-dev.txt --sdist
-                                                    '''
+                                            script: './venv/bin/uv build --build-constraints requirements-dev.txt --sdist'
+                                        )
+                                        sh(
+                                            label: 'Twine check',
+                                            script: './venv/bin/uvx twine check --strict  dist/*'
                                         )
                                         stash includes: 'dist/*.tar.gz,dist/*.zip', name: 'python sdist'
                                         archiveArtifacts artifacts: 'dist/*.tar.gz,dist/*.zip'
-                                        wheelStashes << 'python sdist'
                                     } finally {
                                         sh "${tool(name: 'Default', type: 'git')} clean -dfx"
                                     }
@@ -865,7 +907,7 @@ pipeline {
                                                                                                    trap "rm -rf venv" EXIT
                                                                                                    venv/bin/pip install --disable-pip-version-check uv
                                                                                                    trap "rm -rf venv && rm -rf .tox" EXIT
-                                                                                                   venv/bin/uvx --constraint requirements-dev.txt --with tox-uv  tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')}"""
+                                                                                                   venv/bin/uvx --python-preference system --constraint requirements-dev.txt --with tox-uv  tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')}"""
                                                                                         )
                                                                                 }
                                                                             }
@@ -894,6 +936,103 @@ pipeline {
                                     parallel(testSdistStages)
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+        stage('Deploy'){
+            parallel{
+                stage('Deploy to pypi') {
+                    environment{
+                        PIP_CACHE_DIR='/tmp/pipcache'
+                        UV_INDEX_STRATEGY='unsafe-best-match'
+                        UV_TOOL_DIR='/tmp/uvtools'
+                        UV_PYTHON_INSTALL_DIR='/tmp/uvpython'
+                        UV_CACHE_DIR='/tmp/uvcache'
+                    }
+                    agent {
+                        docker{
+                            image 'python'
+                            label 'docker && linux'
+                            args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'
+                        }
+                    }
+                    when{
+                        allOf{
+                            equals expected: true, actual: params.BUILD_PACKAGES
+                            equals expected: true, actual: params.DEPLOY_PYPI
+                            expression{
+                                try{
+                                    node(){
+                                        configFileProvider([configFile(fileId: PYPI_CONFIG_ID, variable: 'CONFIG_FILE')]) {
+                                            return true
+                                        }
+                                    }
+                                } catch(e){
+                                    echo 'PyPi config not found'
+                                    return false
+                                }
+                                return true
+                            }
+                        }
+                        beforeAgent true
+                        beforeInput true
+                    }
+                    options{
+                        retry(3)
+                    }
+                    input {
+                        message 'Upload to pypi server?'
+                        parameters {
+                            choice(
+                                choices: getPypiConfig(PYPI_CONFIG_ID),
+                                description: 'Url to the pypi index to upload python packages.',
+                                name: 'SERVER_URL'
+                            )
+                        }
+                    }
+                    steps{
+                        unstash 'python sdist'
+                        script{
+                            wheelStashes.each{
+                                unstash it
+                            }
+                        }
+                         withEnv(
+                            [
+                                "TWINE_REPOSITORY_URL=${SERVER_URL}",
+                                'UV_INDEX_STRATEGY=unsafe-best-match'
+                            ]
+                        ){
+                            withCredentials(
+                                [
+                                    usernamePassword(
+                                        credentialsId: 'jenkins-nexus',
+                                        passwordVariable: 'TWINE_PASSWORD',
+                                        usernameVariable: 'TWINE_USERNAME'
+                                    )
+                                ]){
+                                    sh(
+                                        label: 'Uploading to pypi',
+                                        script: '''python3 -m venv venv
+                                                   trap "rm -rf venv" EXIT
+                                                   . ./venv/bin/activate
+                                                   pip install --disable-pip-version-check uv
+                                                   uvx --constraint=requirements-dev.txt twine upload --disable-progress-bar --non-interactive dist/*
+                                                '''
+                                    )
+                            }
+                        }
+                    }
+                    post{
+                        cleanup{
+                            cleanWs(
+                                deleteDirs: true,
+                                patterns: [
+                                        [pattern: 'dist/', type: 'INCLUDE']
+                                    ]
+                            )
                         }
                     }
                 }

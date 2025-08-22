@@ -1,24 +1,19 @@
 #!/usr/bin/env bash
 INSTALLED_UV=$(command -v uv)
-DEFAULT_PYTHON_VENV="./wheel_builder_venv"
 DEFAULT_BASE_PYTHON="python3"
 REQUIREMENTS_FILE="requirements-dev.txt"
 set -e
 
-remove_venv(){
-    if [ -d $1 ]; then
-        echo "removing $1"
-        rm -r $1
-    fi
-}
+verify_package_with_twine() {
+  local dist_directory=$1
+  local build_constraints=$2
+  echo 'Verifying package with twine'
 
-generate_venv(){
-    base_python=$1
-    virtual_env=$2
-    trap "remove_venv $virtual_env" ERR SIGINT SIGTERM
-    $base_python -m venv $virtual_env
-    $virtual_env/bin/pip install --disable-pip-version-check uv
-    . $virtual_env/bin/activate
+  if ! uvx --build-constraints "${build_constraints}" twine check --strict "${dist_directory}"/*.whl
+  then
+    echo "Twine check failed. Please fix the issues and try again."
+    exit 1
+  fi
 }
 
 generate_wheel_with_uv(){
@@ -53,19 +48,20 @@ generate_wheel_with_uv(){
 
     out_temp_wheels_dir=$(mktemp -d /tmp/python_wheels.XXXXXX)
     output_path="./dist"
-    trap "rm -rf $out_temp_wheels_dir" ERR SIGINT SIGTERM RETURN
-    UV_INDEX_STRATEGY=unsafe-best-match _PYTHON_HOST_PLATFORM=$_PYTHON_HOST_PLATFORM MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET ARCHFLAGS=$ARCHFLAGS $uv build --python=$pythonVersion --build-constraints $REQUIREMENTS_FILE --wheel --out-dir=$out_temp_wheels_dir $project_root
+    trap 'rm -rf $out_temp_wheels_dir' ERR SIGINT SIGTERM RETURN
+    UV_INDEX_STRATEGY=unsafe-best-match _PYTHON_HOST_PLATFORM=$_PYTHON_HOST_PLATFORM MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET ARCHFLAGS=$ARCHFLAGS $uv build --python="$pythonVersion" --build-constraints $REQUIREMENTS_FILE --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
+    verify_package_with_twine "$out_temp_wheels_dir" "${REQUIREMENTS_FILE}"
     pattern="$out_temp_wheels_dir/*.whl"
-    files=( $pattern )
+    files=( "$pattern" )
     undelocate_wheel="${files[0]}"
 
     echo ""
     echo "================================================================================"
     echo "${undelocate_wheel} is linked to the following:"
-    $uv tool run --python=$pythonVersion --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-listdeps --depending "${undelocate_wheel}"
+    $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-listdeps --depending "${undelocate_wheel}"
     echo ""
     echo "================================================================================"
-    $uv tool run --python=$pythonVersion --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-wheel -w $output_path --require-archs $REQUIRED_ARCH --verbose "$undelocate_wheel"
+    $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "$undelocate_wheel"
 }
 
 print_usage(){
@@ -84,9 +80,9 @@ show_help() {
 
 install_temporary_uv(){
     venvPath=$1
-    $DEFAULT_BASE_PYTHON -m venv $venvPath
-    trap "rm -rf $venvPath" EXIT
-    $venvPath/bin/pip install --disable-pip-version-check uv
+    $DEFAULT_BASE_PYTHON -m venv "$venvPath"
+    trap 'rm -rf $venvPath' EXIT
+    "$venvPath"/bin/pip install --disable-pip-version-check uv
 }
 
 check_args(){
@@ -109,26 +105,20 @@ for arg in "$@"; do
   fi
 done
 
-scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
+scriptDir=$(dirname "${BASH_SOURCE[0]}")
 # Assign the project_root argument to a variable
 project_root=$(realpath "$scriptDir/..")
 python_version=$1
-
-# venv_path value is set to default
-venv_path=$DEFAULT_PYTHON_VENV
-
-# base_python_path value is set to default
-base_python_path=$DEFAULT_BASE_PYTHON
 
 # validate arguments
 check_args
 
 if [[ ! -f "$INSTALLED_UV" ]]; then
     tmpdir=$(mktemp -d)
-    install_temporary_uv $tmpdir
+    install_temporary_uv "$tmpdir"
     uv=$tmpdir/bin/uv
 else
     uv=$INSTALLED_UV
 fi
 
-generate_wheel_with_uv $uv $project_root $python_version
+generate_wheel_with_uv "$uv" "$project_root" "$python_version"

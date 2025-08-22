@@ -11,9 +11,6 @@ ARG CONAN_CENTER_PROXY_V2_URL=https://center2.conan.io
 # If you want to use a diffrent remote for Conan, such as a proxy. Set the CONAN_CENTER_PROXY_V2_URL
 # Not this is only for building the image. The actual conan center proxy URL is set in the remotes.json file.
 
-ARG manylinux_image=quay.io/pypa/manylinux2014_x86_64
-# Base image to use, this should be of the manylinux family. More info at: https://github.com/pypa/manylinux
-
 ARG UV_CACHE_DIR=/.cache/uv
 # UV Cache directory. Change this only if you need to override the default location.
 
@@ -24,7 +21,7 @@ ARG UV_CONSTRAINT=requirements-dev.txt
 # Python contraint file used when acquiring conan to prebuild the native dependencies
 
 # ==============================================================================
-FROM ${manylinux_image} AS base
+FROM quay.io/pypa/manylinux_2_28 AS base
 
 RUN --mount=type=cache,target=/var/cache/yum \
     yum install -y lndir
@@ -88,6 +85,8 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
 # ==============================================================================
 
 FROM base
+COPY scripts/resources/package_for_linux/build-wheel.sh /usr/bin/build-wheel
+RUN  chmod +x /usr/bin/build-wheel
 
 ARG CONAN_USER_HOME
 ARG CONAN_HOME
@@ -98,8 +97,11 @@ ENV CONAN_USER_HOME=${CONAN_USER_HOME}\
     CONAN_HOME=${CONAN_HOME}\
     UV_CACHE_DIR=${UV_CACHE_DIR}\
     PIP_CACHE_DIR=${PIP_CACHE_DIR}
+
 RUN chmod -R 777 ${CONAN_USER_HOME} && \
     mkdir -p ${PIP_CACHE_DIR} && \
     chmod -R 777 ${PIP_CACHE_DIR} && \
     mkdir -p ${UV_CACHE_DIR} && \
     chmod -R 777 ${UV_CACHE_DIR}
+
+CMD ["build-wheel", "--help"]
