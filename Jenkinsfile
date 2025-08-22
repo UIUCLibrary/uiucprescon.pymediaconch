@@ -296,7 +296,22 @@ def windows_wheels(pythonVersions, testPackages, params, wheelStashes, sharedPip
                                 try{
                                     checkout scm
                                     try{
-                                        powershell(label: 'Building Wheel for Windows', script: "scripts/build_windows.ps1 -PythonVersion ${pythonVersion} -DockerImageName ${dockerImageName}")
+                                        retry(3){
+                                            try{
+                                                powershell(label: 'Building Wheel for Windows', script: "scripts/build_windows.ps1 -PythonVersion ${pythonVersion} -DockerImageName ${dockerImageName}")
+                                            } catch(e){
+                                                cleanWs(
+                                                    patterns: [
+                                                        [pattern: 'dist/', type: 'INCLUDE'],
+                                                        [pattern: 'build/', type: 'INCLUDE'],
+                                                        [pattern: '**/__pycache__/', type: 'INCLUDE'],
+                                                    ],
+                                                    notFailBuild: true,
+                                                    deleteDirs: true
+                                                )
+                                                throw e
+                                            }
+                                        }
                                         stash includes: 'dist/*.whl', name: "python${pythonVersion} windows wheel"
                                         wheelStashes << "python${pythonVersion} windows wheel"
                                         archiveArtifacts artifacts: 'dist/*.whl'
