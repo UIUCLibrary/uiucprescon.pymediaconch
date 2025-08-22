@@ -101,8 +101,8 @@ RUN New-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -
 COPY --from=certsgen c:/roots.sst roots.sst
 RUN certutil -addstore -f root roots.sst ; `
     del roots.sst
-
 ARG CONAN_USER_HOME
 ARG CONAN_HOME
 COPY --from=conan_builder ${CONAN_HOME}/ ${CONAN_HOME}/
 ENV CONAN_USER_HOME=${CONAN_USER_HOME}
+COPY scripts/resources/windows/profile.ps1 C:/Windows/System32/WindowsPowerShell/v1.0/profile.ps1

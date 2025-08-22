@@ -5,16 +5,17 @@ set -e
 WORKSPACE="/workspace"
 
 SKIP_DIRS_NAMED=(\
-    'venv' \
-    '.tox' \
     '.git' \
     '.idea' \
-    'reports' \
     '.mypy_cache' \
+    '.pytest_cache' \
+    '.ruff_cache' \
+    '.tox' \
+    'venv' \
+    'reports' \
     '__pycache__' \
     'wheelhouse' \
     'ci' \
-    '.pytest_cache' \
     'pyMediaConch.egg-info'\
     'uiucprescon.pymediaconch.egg-info'\
     'build' \
@@ -29,7 +30,7 @@ make_shadow_copy() {
   local source_directory=$1
   local container_workspace=$2
   echo 'Making a shadow copy to prevent modifying local files'
-  echo "from $source_directory to $container_workspace"
+#  echo "from $source_directory to $container_workspace"
   local prune_expr=()
   for name in "${SKIP_DIRS_NAMED[@]}"; do
       prune_expr+=(-name "$name" -type d -prune -o);
@@ -84,6 +85,19 @@ make_wheels() {
   done
 }
 
+
+verify_package_with_twine() {
+  local dist_directory=$1
+  local build_constraints=$2
+  echo 'Verifying package with twine'
+
+  if ! uvx --build-constraints "${build_constraints}" twine check --strict "${dist_directory}"/*.whl
+  then
+    echo "Twine check failed. Please fix the issues and try again."
+    exit 1
+  fi
+}
+
 fix_up_wheels(){
   local source_directory=$1
   local output_directory=$2
@@ -116,5 +130,6 @@ echo "Building wheels for Python versions: ${python_versions_to_use[*]}"
 make_shadow_copy "$source_directory" "$WORKSPACE"
 
 make_wheels "$WORKSPACE" "/tmp/dist" "${WORKSPACE}/${build_constraints}" "${python_versions_to_use[@]}"
+verify_package_with_twine "/tmp/dist" "${WORKSPACE}/${build_constraints}"
 fix_up_wheels "/tmp/dist" "${output_directory}"
 echo 'Done'
