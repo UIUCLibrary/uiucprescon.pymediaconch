@@ -645,6 +645,9 @@ pipeline {
             when{
                 equals expected: true, actual: params.BUILD_PACKAGES
             }
+            environment{
+                UV_BUILD_CONSTRAINT='requirements-dev.txt'
+            }
             failFast true
             parallel{
                 stage('Platform Wheels: Linux'){
@@ -691,16 +694,23 @@ pipeline {
                                 PIP_CACHE_DIR='/tmp/pipcache'
                                 UV_INDEX_STRATEGY='unsafe-best-match'
                                 UV_CACHE_DIR='/tmp/uvcache'
+                                UV_TOOL_DIR='/tmp/uvtools'
+                                UV_CONSTRAINT='requirements-dev.txt'
                             }
                             steps{
                                 script{
                                     try{
                                         sh(
+                                            label: 'Setting up uv',
+                                            script: 'python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv'
+                                        )
+                                        sh(
                                             label: 'Package',
-                                            script: '''python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv
-                                                       trap "rm -rf venv" EXIT
-                                                       ./venv/bin/uv build --build-constraints requirements-dev.txt --sdist
-                                                    '''
+                                            script: './venv/bin/uv build --build-constraints requirements-dev.txt --sdist'
+                                        )
+                                        sh(
+                                            label: 'Twine check',
+                                            script: './venv/bin/uvx twine check --strict  dist/*'
                                         )
                                         stash includes: 'dist/*.tar.gz,dist/*.zip', name: 'python sdist'
                                         archiveArtifacts artifacts: 'dist/*.tar.gz,dist/*.zip'

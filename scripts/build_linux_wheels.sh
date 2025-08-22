@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 set -e
-scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
+scriptDir=$(dirname "${BASH_SOURCE[0]}")
 PROJECT_ROOT=$(realpath "$scriptDir/..")
 DEFAULT_PYTHON_VERSION="3.13"
 DOCKERFILE=$(realpath "$scriptDir/resources/package_for_linux/Dockerfile")
@@ -32,32 +32,32 @@ generate_wheel(){
     local python_versions_to_use=("${@:4}")
 
     docker build \
-        -t $docker_image_name_to_use \
-        --platform=$platform \
+        -t "$docker_image_name_to_use" \
+        --platform="$platform" \
         -f "$DOCKERFILE" \
         --build-arg CONAN_CENTER_PROXY_V2_URL \
         --build-arg PIP_EXTRA_INDEX_URL \
         --build-arg PIP_INDEX_URL \
         --build-arg UV_EXTRA_INDEX_URL \
         --build-arg UV_INDEX_URL \
-        --build-arg UV_CONSTRAINT=$constraints_file \
+        --build-arg UV_CONSTRAINT="$constraints_file" \
         "$PROJECT_ROOT"
 
     mkdir -p "$OUTPUT_PATH"
     echo "Building wheels for Python versions: ${python_versions_to_use[*]}"
 
     docker run --rm \
-        --platform=$platform \
+        --platform="$platform" \
         -v "$PROJECT_ROOT":/project:ro \
-        -v $OUTPUT_PATH:/dist \
-        $docker_image_name_to_use \
-        build-wheel /project /dist $constraints_file ${python_versions_to_use[*]}
+        -v "$OUTPUT_PATH":/dist \
+        "$docker_image_name_to_use" \
+        build-wheel /project /dist "$constraints_file" "${python_versions_to_use[@]}"
     echo "Built wheel can be found in '$OUTPUT_PATH'"
 }
 print_usage(){
     echo "Usage: $0 [--project-root[=PROJECT_ROOT]] [--python-version[=PYTHON_VERSION]] [--help]"
 }
-#
+
 show_help() {
   print_usage
   echo
@@ -180,7 +180,6 @@ while [[ "$#" -gt 0 ]]; do
       echo "Unknown argument: $1"
       show_help
       exit 1
-      shift
       ;;
   esac
 done
@@ -205,4 +204,4 @@ else
   echo "Using '$build_constraints_file' for constraints file."
 fi
 check_args
-generate_wheel $PLATFORM $docker_image_name $build_constraints_file ${python_versions[@]}
+generate_wheel "$PLATFORM" "$docker_image_name" "$build_constraints_file" "${python_versions[@]}"

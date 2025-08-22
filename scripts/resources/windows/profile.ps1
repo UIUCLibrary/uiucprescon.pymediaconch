@@ -44,6 +44,18 @@ function Build-Wheel {
         uvx --constraints $ConstraintsFile delvewheel repair $WheelFile --namespace-pkg uiucprescon.pymediaconch --no-mangle-all --wheel-dir $OutputDirectory
     }
 
+    function Verify-PackageWithTwine{
+        param (
+            [string]$PackagePath,
+            [string]$ConstraintsFile
+        )
+        uvx --constraints $ConstraintsFile twine check --strict $PackagePath
+        if ($LASTEXITCODE -ne 0)
+        {
+            throw "Twine check failed for package: $PackagePath"
+        }
+    }
+
     Write-Host "Python Version: $PythonVersion"
 
     Write-Host "Creating shadow copy of source directory..."
@@ -52,8 +64,10 @@ function Build-Wheel {
     Write-Host "Building wheel..."
     New-PythonWheel -Source "$env:TEMP\build_src" -Output "$env:TEMP\wheel_tmp" -PythonVersion $PythonVersion -BuildConstraints $ConstrainstsFile
 
-    Write-Host "Fixing up wheel..."
+
     foreach ($item in $(Get-ChildItem -Path "$env:TEMP\wheel_tmp" -Filter "*.whl")){
+        Verify-PackageWithTwine -PackagePath $item.FullName -ConstraintsFile $ConstrainstsFile
+        Write-Host "Fixing up $item"
         FixupPythonWheel -ConstraintsFile $ConstrainstsFile -WheelFile $item.FullName -OutputDirectory $OutputDirectory
     }
     Write-Host "Wheel built successfully and saved to $OutputDirectory"
