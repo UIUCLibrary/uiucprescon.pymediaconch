@@ -3,7 +3,11 @@ library identifier: 'JenkinsPythonHelperLibrary@2024.2.0', retriever: modernSCM(
   [$class: 'GitSCMSource',
    remote: 'https://github.com/UIUCLibrary/JenkinsPythonHelperLibrary.git',
    ])
+
+def PYPI_CONFIG_ID = 'pypi_config'
+
 def SHARED_PIP_CACHE_VOLUME_NAME = 'pipcache'
+
 def SUPPORTED_WINDOWS_VERSIONS = [
 //     '3.12',
     '3.13'
@@ -18,6 +22,19 @@ def SUPPORTED_LINUX_VERSIONS = [
 ]
 
 def wheelStashes = []
+
+def getPypiConfig(pypiConfigId) {
+    node(){
+        try{
+            configFileProvider([configFile(fileId: pypiConfigId, variable: 'CONFIG_FILE')]) {
+                def config = readJSON( file: CONFIG_FILE)
+                return config['deployment']['indexes']
+            }
+        } catch(e){
+            return []
+        }
+    }
+}
 
 def linux_wheels(pythonVersions, testPackages, params, wheelStashes){
     def selectedArches = []
@@ -350,6 +367,7 @@ pipeline {
         booleanParam(name: 'INCLUDE_MACOS_ARM', defaultValue: false, description: 'Include ARM(m1) architecture for Mac')
         booleanParam(name: 'INCLUDE_MACOS_X86_64', defaultValue: false, description: 'Include x86_64 architecture for Mac')
         booleanParam(name: 'INCLUDE_WINDOWS_X86_64', defaultValue: false, description: 'Include x86_64 architecture for Windows')
+        booleanParam(name: 'DEPLOY_PYPI', defaultValue: false, description: 'Deploy to pypi')
     }
     stages {
         stage('Building and Testing'){
@@ -714,7 +732,6 @@ pipeline {
                                         )
                                         stash includes: 'dist/*.tar.gz,dist/*.zip', name: 'python sdist'
                                         archiveArtifacts artifacts: 'dist/*.tar.gz,dist/*.zip'
-                                        wheelStashes << 'python sdist'
                                     } finally {
                                         sh "${tool(name: 'Default', type: 'git')} clean -dfx"
                                     }
@@ -904,6 +921,103 @@ pipeline {
                                     parallel(testSdistStages)
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+        stage('Deploy'){
+            parallel{
+                stage('Deploy to pypi') {
+                    environment{
+                        PIP_CACHE_DIR='/tmp/pipcache'
+                        UV_INDEX_STRATEGY='unsafe-best-match'
+                        UV_TOOL_DIR='/tmp/uvtools'
+                        UV_PYTHON_INSTALL_DIR='/tmp/uvpython'
+                        UV_CACHE_DIR='/tmp/uvcache'
+                    }
+                    agent {
+                        docker{
+                            image 'python'
+                            label 'docker && linux'
+                            args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'
+                        }
+                    }
+                    when{
+                        allOf{
+                            equals expected: true, actual: params.BUILD_PACKAGES
+                            equals expected: true, actual: params.DEPLOY_PYPI
+                            expression{
+                                try{
+                                    node(){
+                                        configFileProvider([configFile(fileId: PYPI_CONFIG_ID, variable: 'CONFIG_FILE')]) {
+                                            return true
+                                        }
+                                    }
+                                } catch(e){
+                                    echo 'PyPi config not found'
+                                    return false
+                                }
+                                return true
+                            }
+                        }
+                        beforeAgent true
+                        beforeInput true
+                    }
+                    options{
+                        retry(3)
+                    }
+                    input {
+                        message 'Upload to pypi server?'
+                        parameters {
+                            choice(
+                                choices: getPypiConfig(PYPI_CONFIG_ID),
+                                description: 'Url to the pypi index to upload python packages.',
+                                name: 'SERVER_URL'
+                            )
+                        }
+                    }
+                    steps{
+                        unstash 'python sdist'
+                        script{
+                            wheelStashes.each{
+                                unstash it
+                            }
+                        }
+                         withEnv(
+                            [
+                                "TWINE_REPOSITORY_URL=${SERVER_URL}",
+                                'UV_INDEX_STRATEGY=unsafe-best-match'
+                            ]
+                        ){
+                            withCredentials(
+                                [
+                                    usernamePassword(
+                                        credentialsId: 'jenkins-nexus',
+                                        passwordVariable: 'TWINE_PASSWORD',
+                                        usernameVariable: 'TWINE_USERNAME'
+                                    )
+                                ]){
+                                    sh(
+                                        label: 'Uploading to pypi',
+                                        script: '''python3 -m venv venv
+                                                   trap "rm -rf venv" EXIT
+                                                   . ./venv/bin/activate
+                                                   pip install --disable-pip-version-check uv
+                                                   uvx --constraint=requirements-dev.txt twine upload --disable-progress-bar --non-interactive dist/*
+                                                '''
+                                    )
+                            }
+                        }
+                    }
+                    post{
+                        cleanup{
+                            cleanWs(
+                                deleteDirs: true,
+                                patterns: [
+                                        [pattern: 'dist/', type: 'INCLUDE']
+                                    ]
+                            )
                         }
                     }
                 }
