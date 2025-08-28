@@ -471,14 +471,22 @@ pipeline {
                         stage('Running Tests'){
                             parallel {
                                 stage('Running Unit Tests'){
+                                    environment{
+                                        PYTEST_JUNIT_XML='reports/pytest/junit-pytest.xml'
+                                    }
                                     steps{
                                         sh(
                                             label: 'Running pytest',
                                             script: '''mkdir -p reports/pytestcoverage
                                                        . ./venv/bin/activate
-                                                       coverage run --parallel-mode --source=src,tests -m pytest --junitxml=./reports/pytest/junit-pytest.xml --basetemp=/tmp/pytest
+                                                       coverage run --parallel-mode --source=src,tests -m pytest --junitxml=$PYTEST_JUNIT_XML --basetemp=/tmp/pytest
                                                        '''
                                         )
+                                    }
+                                    post{
+                                        always{
+                                            junit env.PYTEST_JUNIT_XML
+                                        }
                                     }
                                 }
                             }
