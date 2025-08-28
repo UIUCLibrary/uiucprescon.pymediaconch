@@ -403,6 +403,7 @@ pipeline {
                             filename 'ci/docker/linux/jenkins/Dockerfile'
                             label 'linux && docker && x86'
                             args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'
+                            additionalBuildArgs '--build-arg CONAN_CENTER_PROXY_V2_URL'
                         }
                     }
                     environment{
@@ -461,7 +462,7 @@ pipeline {
                                                        mkdir -p logs
                                                        mkdir -p reports
                                                        . ./venv/bin/activate
-                                                       python setup.py build_ext --inplace
+                                                       python setup.py build_ext --inplace --build-temp build/temp
                                                        '''
                                         )
                                     }
@@ -470,6 +471,19 @@ pipeline {
                         }
                         stage('Running Tests'){
                             parallel {
+                                stage('Clang Tidy'){
+                                    steps{
+                                        sh 'mkdir -p logs'
+                                        catchError(buildResult: 'SUCCESS', message: 'clang-tidy found some issues', stageResult: 'UNSTABLE') {
+                                            sh 'clang-tidy src/uiucprescon/pymediaconch/pymediaconch.cpp -- $(./venv/bin/python -m pybind11 --includes) -Ibuild/temp/include | tee logs/clang-tidy.log'
+                                        }
+                                    }
+                                    post{
+                                        always{
+                                            recordIssues(tools: [clangTidy(pattern: 'logs/clang-tidy.log')], qualityGates: [[threshold: 1, type: 'TOTAL', unstable: true]])
+                                        }
+                                    }
+                                }
                                 stage('Running Unit Tests'){
                                     environment{
                                         PYTEST_JUNIT_XML='reports/pytest/junit-pytest.xml'
