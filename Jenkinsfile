@@ -403,6 +403,7 @@ pipeline {
                             filename 'ci/docker/linux/jenkins/Dockerfile'
                             label 'linux && docker && x86'
                             args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'
+                            additionalBuildArgs '--build-arg CONAN_CENTER_PROXY_V2_URL'
                         }
                     }
                     environment{
