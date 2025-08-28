@@ -5,6 +5,7 @@
 #include <MediaConch/MediaConchDLL.h>
 
 namespace py = pybind11;
+// NOLINTNEXTLINE(readability-identifier-length, modernize-use-trailing-return-type)
 PYBIND11_MODULE(mediaconch, mod, py::mod_gil_not_used()) {
     mod.doc() = "Python bindings for libmediaconch Library";
 
