@@ -5,10 +5,7 @@
 #include <MediaConch/MediaConchDLL.h>
 
 namespace py = pybind11;
-PYBIND11_MODULE(
-    mediaconch, m
-    //, py::mod_gil_not_used()
-    ) {
+PYBIND11_MODULE(mediaconch, m, py::mod_gil_not_used()) {
     m.doc() = "Python bindings for libmediaconch Library";
 
     // // Bindings for the MediaConchLib class
