@@ -9,14 +9,17 @@ def PYPI_CONFIG_ID = 'pypi_config'
 def SHARED_PIP_CACHE_VOLUME_NAME = 'pipcache'
 
 def SUPPORTED_WINDOWS_VERSIONS = [
+    '3.11',
     '3.12',
     '3.13'
 ]
 def SUPPORTED_MAC_VERSIONS = [
+    '3.11',
     '3.12',
     '3.13'
 ]
 def SUPPORTED_LINUX_VERSIONS = [
+    '3.11',
     '3.12',
     '3.13'
 ]
