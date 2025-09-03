@@ -465,7 +465,7 @@ pipeline {
                                                        mkdir -p logs
                                                        mkdir -p reports
                                                        . ./venv/bin/activate
-                                                       python setup.py build_ext --inplace --build-temp build/temp  --build-lib build/lib
+                                                       python setup.py build_ext --inplace --build-temp build/temp  --build-lib build/lib --debug
                                                        '''
                                         )
                                     }
