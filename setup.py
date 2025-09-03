@@ -124,7 +124,7 @@ def configure_pymediaconch(builder, ext):
         f'-DCMAKE_INSTALL_PREFIX={installed_prefix}',
         f'-DCMAKE_POSITION_INDEPENDENT_CODE=true',
         "-B", build_dir,
-        f"-DCMAKE_BUILD_TYPE={'Debug' if builder.debug else 'Release'}"
+        f"-DCMAKE_BUILD_TYPE=Release"
     ]
     try:
         builder.spawn(config_cmd)
@@ -134,7 +134,7 @@ def configure_pymediaconch(builder, ext):
         cmake_exec,
         "--build", build_dir,
         "--target", "MediaConchLib",
-        "--config", "Debug" if builder.debug else "Release",
+        "--config", "Release",
     ]
     try:
         builder.spawn(build_cmd)
@@ -144,7 +144,7 @@ def configure_pymediaconch(builder, ext):
     install_command = [
         cmake_exec,
         "--build", build_dir,
-        "--config", "Debug" if builder.debug else "Release",
+        "--config", "Release",
         "--target", "install"
     ]
     try:
