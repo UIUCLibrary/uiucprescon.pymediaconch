@@ -1,18 +1,25 @@
 import functools
+import importlib
 import os.path
 import pathlib
-import platform
+import pybind11_stubgen
+import importlib.util
 import shutil
 
+import setuptools.command.build_py
 from pybind11.setup_helpers import Pybind11Extension
 from uiucprescon.build.pybind11_builder import BuildPybind11Extension
-from uiucprescon.build.conan.files import read_conan_build_info_json, get_library_metadata_from_build_info_json
+from uiucprescon.build.conan.files import (
+    get_library_metadata_from_build_info_json
+)
 from uiucprescon.build import conan_libs
 from setuptools import setup
 import cmake
 import json
 
 MEDIACONCH_EXTENSION = "uiucprescon.pymediaconch.mediaconch"
+
+
 def locate_conan_build_info_json(build_temp):
 
     build_locations = [
@@ -29,9 +36,15 @@ def locate_conan_build_info_json(build_temp):
         raise FileNotFoundError(
             f"conan_build_info.json not found, searched {*build_locations,}"
         )
+
+
 def add_conan_build_info(core_ext, build_temp, library_name=None):
 
-    with open(locate_conan_build_info_json(build_temp), 'r', encoding="utf-8") as f:
+    with open(
+        locate_conan_build_info_json(build_temp),
+        'r',
+        encoding="utf-8"
+    ) as f:
         build_info = get_library_metadata_from_build_info_json(library_name, f)
         # build_info = read_conan_build_info_json(f)
         # breakpoint()
@@ -49,6 +62,7 @@ def add_conan_build_info(core_ext, build_temp, library_name=None):
 
     return core_ext
 
+
 def get_binary_directory(cmake_presets_json, config_preset):
     """
     Get the binary directory from the CMakePresets.json file.
@@ -60,7 +74,10 @@ def get_binary_directory(cmake_presets_json, config_preset):
         if preset.get('name') == config_preset:
             if 'binaryDir' in preset:
                 return preset['binaryDir']
-    raise ValueError(f"Binary directory not found in CMakePresets.json for preset: {config_preset}")
+    raise ValueError(
+        "Binary directory not found in CMakePresets.json for "
+        f"preset: {config_preset}"
+    )
 
 
 def find_best_config_preset(cmake_presets_json):
@@ -77,12 +94,13 @@ def find_best_config_preset(cmake_presets_json):
             return preset['name']
         if preset.get('name') == "conan-default":
             return preset['name']
-    raise ValueError("No suitable configuration preset found in CMakePresets.json")
+    raise ValueError(
+        "No suitable configuration preset found in CMakePresets.json"
+    )
+
 
 def find_config_preset_toolchain(cmake_presets_json, config_preset):
-    """
-    Find the toolchain file for the given configuration preset in the CMakePresets.json file.
-    """
+    """Find toolchain file for given config preset in CMakePresets.json."""
     with open(cmake_presets_json, 'r', encoding='utf-8') as f:
         presets = json.load(f)
     for preset in presets.get('configurePresets', []):
@@ -92,18 +110,26 @@ def find_config_preset_toolchain(cmake_presets_json, config_preset):
             return preset.get('toolchainFile')
     raise ValueError(f"Preset not found in CMakePresets.json: {config_preset}")
 
-def configure_pymediaconch(builder, ext):
+
+def configure_pymediaconch(
+    builder: "BuildExtension",
+    ext: Pybind11Extension
+) -> None:
     cmake_exec = shutil.which("cmake", path=cmake.CMAKE_BIN_DIR)
     if cmake_exec is None:
-        raise FileNotFoundError("CMake executable not found. This should have been installed pep517 build dependencies.")
+        raise FileNotFoundError(
+            "CMake executable not found. This should have been installed "
+            "pep517 build dependencies."
+        )
     assert os.path.exists('CMakeUserPresets.json')
     cmake_presets_json = builder.locate_cmake_presets_json()
 
     cmake_fetchcontent_base_dir = os.path.join(builder.build_temp, "deps")
     config_preset = find_best_config_preset(cmake_presets_json)
-    build_preset = "conan-release"
     build_dir = os.path.join(builder.build_temp, "mediaconchlib")
-    conan_toolchain_file = find_config_preset_toolchain(cmake_presets_json, config_preset)
+    conan_toolchain_file =\
+        find_config_preset_toolchain(cmake_presets_json, config_preset)
+
     conan_binary_dir = get_binary_directory(cmake_presets_json, config_preset)
     if all([conan_binary_dir, conan_toolchain_file]):
         toolchain_file = os.path.join(conan_binary_dir, conan_toolchain_file)
@@ -122,35 +148,44 @@ def configure_pymediaconch(builder, ext):
         f"-DCMAKE_TOOLCHAIN_FILE={toolchain_file}" if toolchain_file else "",
         f"-DFETCHCONTENT_BASE_DIR={cmake_fetchcontent_base_dir}",
         f'-DCMAKE_INSTALL_PREFIX={installed_prefix}',
-        f'-DCMAKE_POSITION_INDEPENDENT_CODE=true',
+        '-DCMAKE_POSITION_INDEPENDENT_CODE=true',
         "-B", build_dir,
-        f"-DCMAKE_BUILD_TYPE={'Debug' if builder.debug else 'Release'}"
+        f"-DCMAKE_BUILD_TYPE=Release"
     ]
     try:
         builder.spawn(config_cmd)
     except Exception as e:
-        raise ValueError(f"cmake command failed during config. Used command: {' '.join(config_cmd)}") from e
+        raise ValueError(
+            "cmake command failed during config. "
+            f"Used command: {' '.join(config_cmd)}"
+        ) from e
     build_cmd = [
         cmake_exec,
         "--build", build_dir,
         "--target", "MediaConchLib",
-        "--config", "Debug" if builder.debug else "Release",
+        "--config", "Release",
     ]
     try:
         builder.spawn(build_cmd)
     except Exception as e:
-        raise ValueError(f"cmake command failed during build. Used command: {' '.join(build_cmd)}") from e
+        raise ValueError(
+            "cmake command failed during build. "
+            f"Used command: {' '.join(build_cmd)}"
+        ) from e
 
     install_command = [
         cmake_exec,
         "--build", build_dir,
-        "--config", "Debug" if builder.debug else "Release",
+        "--config", "Release",
         "--target", "install"
     ]
     try:
         builder.spawn(install_command)
     except Exception as e:
-        raise ValueError(f"cmake command failed during install. Used command: {' '.join(install_command)}") from e
+        raise ValueError(
+            f"cmake command failed during install. "
+            f"Used command: {' '.join(install_command)}"
+        ) from e
 
     ext.include_dirs.append(os.path.join(installed_prefix, "include"))
     ext.libraries.append("mediaconch")
@@ -158,13 +193,24 @@ def configure_pymediaconch(builder, ext):
     ext.library_dirs.append(os.path.join(installed_prefix, "lib"))
     build_conan_cmd = builder.get_finalized_command("build_conan")
 
-    add_conan_build_info(ext, builder.get_finalized_command("build_conan").build_temp)
-    conan_libs.update_extension3(ext, functools.partial(conan_libs.match_libs,  build_path=build_conan_cmd.build_temp))
+    add_conan_build_info(
+        ext,
+        builder.get_finalized_command("build_conan").build_temp
+    )
+    conan_libs.update_extension3(
+        ext,
+        functools.partial(
+            conan_libs.match_libs,
+            build_path=build_conan_cmd.build_temp
+        )
+    )
     if builder.compiler.compiler_type == 'msvc':
         ext.libraries += [
-            # shell32 is needed because SHGetKnownFolderPath is called in Core::get_local_config_path() in Core.cpp
+            # shell32 is needed because SHGetKnownFolderPath is called in
+            # Core::get_local_config_path() in Core.cpp
             "shell32",
-            # ole32 is needed because CoTaskMemFree() is called in Core::get_local_config_path() in Core.cpp
+            # ole32 is needed because CoTaskMemFree() is called in
+            # Core::get_local_config_path() in Core.cpp
             "ole32",
         ]
     # Remove the overlap
@@ -183,6 +229,103 @@ def configure_pymediaconch(builder, ext):
     ext.include_dirs = include_dirs
 
 
+def get_stub_parser():
+    from pybind11_stubgen.parser.mixins.error_handlers import (
+        IgnoreAllErrors,
+        IgnoreInvalidExpressionErrors,
+        IgnoreInvalidIdentifierErrors,
+        IgnoreUnresolvedNameErrors,
+        LogErrors,
+        LoggerData,
+        SuggestCxxSignatureFix,
+        TerminateOnFatalErrors,
+    )
+    from pybind11_stubgen.parser.mixins.filter import (
+        FilterClassMembers,
+        FilterInvalidIdentifiers,
+        FilterPybind11ViewClasses,
+        FilterPybindInternals,
+        FilterTypingModuleAttributes,
+    )
+    from pybind11_stubgen.parser.mixins.fix import (
+        FixBuiltinTypes,
+        FixCurrentModulePrefixInTypeNames,
+        FixMissing__all__Attribute,
+        FixMissing__future__AnnotationsImport,
+        FixMissingEnumMembersAnnotation,
+        FixMissingFixedSizeImport,
+        FixMissingImports,
+        FixMissingNoneHashFieldAnnotation,
+        FixNumpyArrayFlags,
+        FixNumpyDtype,
+        FixPEP585CollectionNames,
+        FixPybind11EnumStrDoc,
+        FixRedundantBuiltinsAnnotation,
+        FixRedundantMethodsFromBuiltinObject,
+        FixScipyTypeArguments,
+        FixTypingTypeNames,
+        FixValueReprRandomAddress,
+        OverridePrintSafeValues,
+        RemoveSelfAnnotation,
+        ReplaceReadWritePropertyWithField,
+        RewritePybind11EnumValueRepr,
+    )
+    from pybind11_stubgen.parser.mixins.parse import (
+        BaseParser,
+        ExtractSignaturesFromPybind11Docstrings,
+        ParserDispatchMixin,
+    )
+
+    error_handlers_top: list[type] = [
+        LoggerData,
+        *([IgnoreAllErrors]),
+        *([IgnoreInvalidIdentifierErrors]),
+        *([IgnoreInvalidExpressionErrors]),
+        *([IgnoreUnresolvedNameErrors]),
+    ]
+    error_handlers_bottom: list[type] = [
+        LogErrors,
+        SuggestCxxSignatureFix,
+        *([TerminateOnFatalErrors]),
+    ]
+
+    class Parser(
+        *error_handlers_top,  # type: ignore[misc]
+        FixMissing__future__AnnotationsImport,
+        FixMissing__all__Attribute,
+        FixMissingNoneHashFieldAnnotation,
+        FixMissingImports,
+        FilterTypingModuleAttributes,
+        FixPEP585CollectionNames,
+        FixTypingTypeNames,
+        FixScipyTypeArguments,
+        FixMissingFixedSizeImport,
+        FixMissingEnumMembersAnnotation,
+        OverridePrintSafeValues,
+        FixNumpyDtype,
+        FixNumpyArrayFlags,
+        FixCurrentModulePrefixInTypeNames,
+        FixBuiltinTypes,
+        RewritePybind11EnumValueRepr,
+        FilterClassMembers,
+        ReplaceReadWritePropertyWithField,
+        FilterInvalidIdentifiers,
+        FixValueReprRandomAddress,
+        FixRedundantBuiltinsAnnotation,
+        FilterPybindInternals,
+        FilterPybind11ViewClasses,
+        FixRedundantMethodsFromBuiltinObject,
+        RemoveSelfAnnotation,
+        FixPybind11EnumStrDoc,
+        ExtractSignaturesFromPybind11Docstrings,
+        ParserDispatchMixin,
+        BaseParser,
+        *error_handlers_bottom,  # type: ignore[misc]
+    ):
+        pass
+    return Parser()
+
+
 class BuildExtension(BuildPybind11Extension):
     def locate_cmake_presets_json(self):
         """
@@ -194,33 +337,78 @@ class BuildExtension(BuildPybind11Extension):
             os.path.abspath(os.path.join(self.build_temp, "generators")),
             os.path.abspath(build_conan_cmd.build_temp),
             os.path.abspath(os.path.join(build_conan_cmd.build_temp, "build")),
-            os.path.abspath(os.path.join(build_conan_cmd.build_temp, "build", "generators")),
-            os.path.abspath(os.path.join(build_conan_cmd.build_temp, "build", "Release", "generators")),
+            os.path.abspath(
+                os.path.join(build_conan_cmd.build_temp, "build", "generators")
+            ),
+            os.path.abspath(
+                os.path.join(
+                    build_conan_cmd.build_temp,
+                    "build", "Release", "generators"
+                )
+            ),
         ]
 
         for location in possible_locations:
             cmake_presets_json = os.path.join(location, "CMakePresets.json")
             if os.path.exists(cmake_presets_json):
                 return cmake_presets_json
-        raise FileNotFoundError(f"CMakePresets.json not found, searched in: {*possible_locations,}")
+        raise FileNotFoundError(
+            f"CMakePresets.json not found, searched in: {*possible_locations,}"
+        )
 
     def run(self):
         build_conan_cmd = self.get_finalized_command("build_conan")
         try:
             locate_conan_build_info_json(build_conan_cmd.build_temp)
         except FileNotFoundError:
-            # if conan was not run there will be no conan_build_info.json, so we run it now
+            # if conan was not run there will be no conan_build_info.json,
+            # so we run it now
             build_conan_cmd.run()
         super().run()
-
 
     def build_extension(self, ext: Pybind11Extension) -> None:
         if ext.name == MEDIACONCH_EXTENSION:
             configure_pymediaconch(self, ext)
         super().build_extension(ext)
+        self.generate_stubs(ext, module_file=self.get_ext_fullpath(ext.name))
+        # if ext.name == MEDIACONCH_EXTENSION:
+
+    @staticmethod
+    def generate_stubs(ext: Pybind11Extension, module_file: str) -> None:
+        parser = get_stub_parser()
+        printer = pybind11_stubgen.Printer(invalid_expr_as_ellipses=False)
+        module_name = ext.name
+        module = parser.handle_module(
+            pybind11_stubgen.QualifiedName.from_str(module_name),
+            importlib.util.module_from_spec(
+                importlib.util.spec_from_file_location(
+                    module_name,
+                    module_file
+                )
+            )
+        )
+        parser.finalize()
+        out_dir = pathlib.Path(os.path.dirname(module_file))
+        if module is None:
+            raise RuntimeError(f"Can't parse {module_name}")
+        out_dir.mkdir(exist_ok=True, parents=True)
+        stub_writer = pybind11_stubgen.Writer()
+        stub_writer.write_module(module, printer, to=out_dir)
+
+
+class MakeTyped(setuptools.command.build_py.build_py):
+
+    def run(self) -> None:
+        super().run()
+        package_dir = os.path.join(self.build_lib, 'uiucprescon', 'pymediaconch')
+        if not pathlib.Path(package_dir).exists():
+            pathlib.Path(package_dir).mkdir(parents=True, exist_ok=True)
+        outfile_path = os.path.join(package_dir, "py.typed")
+        pathlib.Path(outfile_path).touch()
+
 
 setup(
-    ext_modules = [
+    ext_modules=[
         Pybind11Extension(
             name=MEDIACONCH_EXTENSION,
             sources=["src/uiucprescon/pymediaconch/pymediaconch.cpp"],
@@ -230,5 +418,6 @@ setup(
     ],
     cmdclass={
         "build_ext": BuildExtension,
+        "build_py": MakeTyped,
     }
 )

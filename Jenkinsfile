@@ -396,7 +396,7 @@ pipeline {
                 }
             }
             stages{
-                stage('Code Quality') {
+                            stage('Code Quality') {
                     when{
                         equals expected: true, actual: params.RUN_CHECKS
                         beforeAgent true
@@ -444,7 +444,7 @@ pipeline {
                                                         notFailBuild: true,
                                                         deleteDirs: true
                                                         )
-                                                    raise e
+                                                    throw e
                                                 }
                                             }
                                         }
@@ -465,13 +465,44 @@ pipeline {
                                                        mkdir -p logs
                                                        mkdir -p reports
                                                        . ./venv/bin/activate
-                                                       python setup.py build_ext --inplace --build-temp build/temp
+                                                       python setup.py build_ext --inplace --build-temp build/temp  --build-lib build/lib --debug
                                                        '''
                                         )
                                     }
                                 }
                             }
                         }
+                        stage('Sphinx Documentation'){
+                            steps {
+                                sh(
+                                    label: 'Building docs',
+                                    script: '''. ./venv/bin/activate
+                                               sphinx-build -b html docs/source build/docs/html -d build/docs/doctrees -v -w logs/build_sphinx.log -W --keep-going
+                                            '''
+                                )
+                                publishHTML(
+                                    [
+                                        allowMissing: false,
+                                        alwaysLinkToLastBuild: false,
+                                        keepAll: false, reportDir: 'build/docs/html',
+                                        reportFiles: 'index.html',
+                                        reportName: 'Documentation',
+                                        reportTitles: ''
+                                    ]
+                                )
+                            }
+                            post{
+                                always {
+                                    recordIssues(tools: [sphinxBuild(id: 'sphinxBuild', name: 'Sphinx Documentation Build', pattern: 'logs/build_sphinx.log')])
+                                    archiveArtifacts artifacts: 'logs/build_sphinx.log'
+                                    script{
+                                        def props = readTOML( file: 'pyproject.toml')['project']
+                                        zip archive: true, dir: 'build/docs/html', glob: '', zipFile: "dist/${props.name}-${props.version}.doc.zip"
+                                    }
+                                    stash includes: 'dist/*.doc.zip,build/docs/html/**', name: 'DOCS_ARCHIVE'
+                                }
+                           }
+                       }
                         stage('Running Tests'){
                             parallel {
                                 stage('Clang Tidy'){
@@ -503,6 +534,61 @@ pipeline {
                                     post{
                                         always{
                                             junit env.PYTEST_JUNIT_XML
+                                        }
+                                    }
+                                }
+                                stage('Documentation linkcheck'){
+                                    steps {
+                                        catchError(buildResult: 'SUCCESS', message: 'Sphinx docs linkcheck', stageResult: 'UNSTABLE') {
+                                            sh(
+                                                label: 'Running Sphinx docs linkcheck',
+                                                script: '''. ./venv/bin/activate
+                                                           python -m sphinx -b doctest docs/source build/docs -d build/docs/doctrees --no-color --builder=linkcheck --fail-on-warning -w logs/linkcheck.log
+                                                           '''
+                                                )
+                                        }
+                                    }
+                                    post{
+                                        always {
+                                            recordIssues(tools: [sphinxBuild(id: 'doclinkcheck', name: 'linkcheck', pattern: 'logs/linkcheck.log')])
+                                        }
+                                    }
+                                }
+                                stage('Documentation Doctest'){
+                                    steps {
+                                        sh(
+                                            label: 'Running Doctest Tests',
+                                            script: '''. ./venv/bin/activate
+                                                       coverage run --parallel-mode --source=src -m sphinx -b doctest docs/source dist/docs/html -d build/docs/doctrees --no-color -w logs/doctest.txt
+                                                    '''
+                                            )
+                                    }
+                                    post{
+                                        always {
+                                            recordIssues(tools: [sphinxBuild(id: 'doctest', name: 'Doctest', pattern: 'logs/doctest.txt')])
+                                        }
+                                    }
+                                }
+                                stage('MyPy Static Analysis') {
+                                    environment{
+                                        MYPYPATH='build/lib'
+                                    }
+                                    steps{
+                                        catchError(buildResult: 'SUCCESS', message: 'MyPy found issues', stageResult: 'UNSTABLE') {
+                                            sh(
+                                                label: 'Running Mypy',
+                                                script: '''. ./venv/bin/activate
+                                                           uv pip install mypy lxml
+                                                           mkdir -p logs
+                                                           mypy -p uiucprescon.pymediaconch --html-report reports/mypy/html > logs/mypy.log
+                                                           '''
+                                           )
+                                        }
+                                    }
+                                    post {
+                                        always {
+                                            recordIssues(tools: [myPy(name: 'MyPy', pattern: 'logs/mypy.log')])
+                                            publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'reports/mypy/html/', reportFiles: 'index.html', reportName: 'MyPy HTML Report', reportTitles: ''])
                                         }
                                     }
                                 }
@@ -586,7 +672,7 @@ pipeline {
                                                                                            venv/bin/uvx --python ${version} --python-preference system --with tox-uv tox run -e ${toxEnv} -vv
                                                                                         """
                                                                                 )
-                                                                        } finally{
+                                                                        } catch(e){
                                                                             cleanWs(
                                                                                 patterns: [
                                                                                     [pattern: 'venv/', type: 'INCLUDE'],
@@ -594,6 +680,7 @@ pipeline {
                                                                                     [pattern: '**/__pycache__/', type: 'INCLUDE'],
                                                                                 ]
                                                                             )
+                                                                            throw e
                                                                         }
                                                                     }
                                                                 }
@@ -601,7 +688,9 @@ pipeline {
                                                                 sh "${tool(name: 'Default', type: 'git')} clean -dfx"
                                                             }
                                                         } finally {
-                                                            sh "docker rmi ${image.id}"
+                                                            if (image){
+                                                                sh "docker rmi --force --no-prune ${image.id}"
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -673,7 +762,7 @@ pipeline {
                                                                                            uvx -p ${version} --constraint=requirements-dev.txt --with tox-uv tox run -e ${toxEnv} -vv
                                                                                         """
                                                                             )
-                                                                        } finally{
+                                                                        } catch (e){
                                                                             cleanWs(
                                                                                 patterns: [
                                                                                         [pattern: '.tox', type: 'INCLUDE'],
@@ -681,6 +770,7 @@ pipeline {
                                                                                 notFailBuild: true,
                                                                                 deleteDirs: true
                                                                             )
+                                                                            throw e;
                                                                         }
                                                                     }
                                                                 }
@@ -688,7 +778,9 @@ pipeline {
                                                                 bat "${tool(name: 'Default', type: 'git')} clean -dfx"
                                                             }
                                                         } finally{
-                                                            bat "docker rmi --force --no-prune ${image.id}"
+                                                            if (image){
+                                                                bat "docker rmi --force --no-prune ${image.id}"
+                                                            }
                                                         }
                                                      }
                                                  }
