@@ -465,7 +465,7 @@ pipeline {
                                                        mkdir -p logs
                                                        mkdir -p reports
                                                        . ./venv/bin/activate
-                                                       python setup.py build_ext --inplace --build-temp build/temp
+                                                       python setup.py build_ext --inplace --build-temp build/temp  --build-lib build/lib
                                                        '''
                                         )
                                     }
@@ -503,6 +503,29 @@ pipeline {
                                     post{
                                         always{
                                             junit env.PYTEST_JUNIT_XML
+                                        }
+                                    }
+                                }
+                                stage('MyPy Static Analysis') {
+                                    environment{
+                                        MYPYPATH='build/lib'
+                                    }
+                                    steps{
+                                        catchError(buildResult: 'SUCCESS', message: 'MyPy found issues', stageResult: 'UNSTABLE') {
+                                            sh(
+                                                label: 'Running Mypy',
+                                                script: '''. ./venv/bin/activate
+                                                           uv pip install mypy lxml
+                                                           mkdir -p logs
+                                                           mypy -p uiucprescon.pymediaconch --html-report reports/mypy/html > logs/mypy.log
+                                                           '''
+                                           )
+                                        }
+                                    }
+                                    post {
+                                        always {
+                                            recordIssues(tools: [myPy(name: 'MyPy', pattern: 'logs/mypy.log')])
+                                            publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: 'reports/mypy/html/', reportFiles: 'index.html', reportName: 'MyPy HTML Report', reportTitles: ''])
                                         }
                                     }
                                 }

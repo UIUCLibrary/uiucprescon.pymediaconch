@@ -1,5 +1,7 @@
 cmake<4.0
 coverage
+lxml
+mypy
 pytest
 pybind11>=2.13.0
 setuptools

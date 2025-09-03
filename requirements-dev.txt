@@ -28,14 +28,22 @@ iniconfig==2.1.0
     # via pytest
 jinja2==3.1.6
     # via conan
+lxml==6.0.1
+    # via -r requirements/requirements-dev.txt
 markupsafe==3.0.2
     # via jinja2
+mypy==1.17.1
+    # via -r requirements/requirements-dev.txt
+mypy-extensions==1.1.0
+    # via mypy
 packaging==25.0
     # via pytest
 patch-ng==1.18.1
     # via conan
 patchelf==0.17.2.4 ; sys_platform == 'linux'
     # via uiucprescon-build
+pathspec==0.12.1
+    # via mypy
 pluggy==1.6.0
     # via pytest
 pybind11==2.13.6
@@ -63,9 +71,13 @@ six==1.17.0
 toml==0.10.2
     # via uiucprescon-build
 tomli==2.2.1 ; python_full_version < '3.11'
-    # via pytest
-typing-extensions==4.15.0 ; python_full_version < '3.11'
-    # via exceptiongroup
+    # via
+    #   mypy
+    #   pytest
+typing-extensions==4.15.0
+    # via
+    #   exceptiongroup
+    #   mypy
 uiucprescon-build @ https://github.com/UIUCLibrary/uiucprescon_build/releases/download/v0.3.0/uiucprescon_build-0.3.0-py3-none-any.whl
     # via -r requirements/requirements-dev.txt
 urllib3==2.0.7
