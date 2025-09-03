@@ -12,9 +12,9 @@ colorama==0.4.6
     # via
     #   conan
     #   pytest
-conan==2.19.1
+conan==2.20.0
     # via uiucprescon-build
-coverage==7.10.5
+coverage==7.10.6
     # via -r requirements/requirements-dev.txt
 distro==1.8.0 ; platform_system == 'FreeBSD' or sys_platform == 'linux'
     # via conan
@@ -50,6 +50,8 @@ pybind11==2.13.6
     # via
     #   -r requirements/requirements-dev.txt
     #   uiucprescon-build
+pybind11-stubgen==2.5.5
+    # via -r requirements/requirements-dev.txt
 pygments==2.19.2
     # via pytest
 pytest==8.4.1
@@ -80,7 +82,7 @@ typing-extensions==4.15.0
     #   mypy
 uiucprescon-build @ https://github.com/UIUCLibrary/uiucprescon_build/releases/download/v0.3.0/uiucprescon_build-0.3.0-py3-none-any.whl
     # via -r requirements/requirements-dev.txt
-urllib3==2.0.7
+urllib3==2.5.0
     # via
     #   conan
     #   requests
