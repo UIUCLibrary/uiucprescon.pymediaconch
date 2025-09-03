@@ -602,7 +602,9 @@ pipeline {
                                                                 sh "${tool(name: 'Default', type: 'git')} clean -dfx"
                                                             }
                                                         } finally {
-                                                            sh "docker rmi ${image.id}"
+                                                            if (image){
+                                                                sh "docker rmi --force --no-prune ${image.id}"
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -690,7 +692,9 @@ pipeline {
                                                                 bat "${tool(name: 'Default', type: 'git')} clean -dfx"
                                                             }
                                                         } finally{
-                                                            bat "docker rmi --force --no-prune ${image.id}"
+                                                            if (image){
+                                                                bat "docker rmi --force --no-prune ${image.id}"
+                                                            }
                                                         }
                                                      }
                                                  }
