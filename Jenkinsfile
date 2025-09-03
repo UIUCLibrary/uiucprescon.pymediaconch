@@ -444,7 +444,7 @@ pipeline {
                                                         notFailBuild: true,
                                                         deleteDirs: true
                                                         )
-                                                    raise e
+                                                    throw e
                                                 }
                                             }
                                         }
@@ -586,7 +586,7 @@ pipeline {
                                                                                            venv/bin/uvx --python ${version} --python-preference system --with tox-uv tox run -e ${toxEnv} -vv
                                                                                         """
                                                                                 )
-                                                                        } finally{
+                                                                        } catch(e){
                                                                             cleanWs(
                                                                                 patterns: [
                                                                                     [pattern: 'venv/', type: 'INCLUDE'],
@@ -594,6 +594,7 @@ pipeline {
                                                                                     [pattern: '**/__pycache__/', type: 'INCLUDE'],
                                                                                 ]
                                                                             )
+                                                                            throw e
                                                                         }
                                                                     }
                                                                 }
@@ -673,7 +674,7 @@ pipeline {
                                                                                            uvx -p ${version} --constraint=requirements-dev.txt --with tox-uv tox run -e ${toxEnv} -vv
                                                                                         """
                                                                             )
-                                                                        } finally{
+                                                                        } catch (e){
                                                                             cleanWs(
                                                                                 patterns: [
                                                                                         [pattern: '.tox', type: 'INCLUDE'],
@@ -681,6 +682,7 @@ pipeline {
                                                                                 notFailBuild: true,
                                                                                 deleteDirs: true
                                                                             )
+                                                                            throw e;
                                                                         }
                                                                     }
                                                                 }
