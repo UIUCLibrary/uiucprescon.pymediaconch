@@ -570,13 +570,16 @@ pipeline {
                                                     node('docker && linux && x86_64'){
                                                         checkout scm
                                                         def image
+                                                        def maxRetries = 3
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
-                                                            image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL .')
+                                                            retry(maxRetries){
+                                                                image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL .')
+                                                            }
                                                         }
                                                         try{
                                                             try{
                                                                 image.inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'){
-                                                                    retry(3){
+                                                                    retry(maxRetries){
                                                                         try{
                                                                             sh( label: 'Running Tox',
                                                                                 script: """python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv
