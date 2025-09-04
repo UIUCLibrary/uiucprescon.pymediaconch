@@ -1031,6 +1031,7 @@ pipeline {
                                                                                                    trap "rm -rf venv" EXIT
                                                                                                    venv/bin/pip install --disable-pip-version-check uv
                                                                                                    trap "rm -rf venv && rm -rf .tox" EXIT
+                                                                                                   venv/bin/uv export --frozen --only-dev --no-hashes > requirements-dev.txt
                                                                                                    venv/bin/uvx --python-preference system --constraint requirements-dev.txt --with tox-uv  tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')}"""
                                                                                         )
                                                                                 }

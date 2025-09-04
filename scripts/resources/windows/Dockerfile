@@ -76,7 +76,6 @@ ARG CONAN_HOME
 ARG UV_INDEX_URL
 COPY ci/docker/shared/conan/remotes.json ${CONAN_HOME}/remotes.json
 COPY scripts/resources/windows/conan/profile.ini ${CONAN_HOME}/profiles/default
-#COPY requirements-dev.txt c:/temp/requirements-dev.txt
 COPY uv.lock pyproject.toml c:/temp/project/
 COPY conanfile.py c:/temp/conanfile.py
 ENV UV_CONSTRAINT=c:/temp/requirements-dev.txt
