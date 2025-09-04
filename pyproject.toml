@@ -34,7 +34,8 @@ dev = [
     "pybind11>=2.13.0",
     "pybind11_stubgen",
     "setuptools",
-    'tox',
+    "tox",
+    "uiucprescon.build @ https://github.com/UIUCLibrary/uiucprescon_build/releases/download/v0.3.0/uiucprescon_build-0.3.0-py3-none-any.whl"
 ]
 
 
