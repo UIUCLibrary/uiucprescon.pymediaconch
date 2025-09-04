@@ -855,11 +855,11 @@ pipeline {
                                     try{
                                         sh(
                                             label: 'Setting up uv',
-                                            script: 'python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv'
+                                            script: 'python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv && venv/bin/uv export --frozen --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate > $UV_CONSTRAINT'
                                         )
                                         sh(
                                             label: 'Package',
-                                            script: './venv/bin/uv build --build-constraints requirements-dev.txt --sdist'
+                                            script: './venv/bin/uv build --build-constraints $UV_CONSTRAINT --sdist'
                                         )
                                         sh(
                                             label: 'Twine check',
