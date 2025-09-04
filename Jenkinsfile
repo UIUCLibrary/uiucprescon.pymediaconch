@@ -905,6 +905,7 @@ pipeline {
                                                                         sh(label: 'Running Tox',
                                                                            script: """python${pythonVersion} -m venv venv
                                                                                       venv/bin/python -m pip install --disable-pip-version-check uv
+                                                                                      uv export --frozen --only-dev --no-hashes > requirements-dev.txt
                                                                                       venv/bin/uvx --constraint requirements-dev.txt --with tox-uv tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
                                                                                       rm -rf ./.tox
                                                                                       rm -rf ./venv
@@ -959,7 +960,9 @@ pipeline {
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
                                                                                         powershell(
                                                                                             label: 'Running Tox',
-                                                                                            script: "uvx --constraint requirements-dev.txt --with tox-uv tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
+                                                                                            script: """uv export --frozen --only-dev --no-hashes > requirements-dev.txt
+                                                                                                       uvx --constraint requirements-dev.txt --with tox-uv tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
+                                                                                                    """
                                                                                         )
                                                                                     }
                                                                                 }
