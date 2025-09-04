@@ -1,0 +1,40 @@
+name: documentation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 'Deploy documentation'
+        required: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+      - name: Install dependencies
+        run: |
+          pip install uv
+          uv venv
+          . ./.venv/bin/activate
+          uv pip install -e .
+          uv pip install --constraints=requirements-dev.txt sphinx
+      - name: Sphinx build
+        run: |
+          . ./.venv/bin/activate
+          sphinx-build docs/source _build
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true'
+        with:
+          publish_branch: gh-pages
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: _build/
+          force_orphan: true
