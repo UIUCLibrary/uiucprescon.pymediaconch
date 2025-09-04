@@ -17,9 +17,6 @@ ARG UV_CACHE_DIR=/.cache/uv
 ARG PIP_CACHE_DIR=/.cache/pip
 # PIP Cache directory. Change this only if you need to override the default location.
 
-ARG UV_CONSTRAINT=requirements-dev.txt
-# Python contraint file used when acquiring conan to prebuild the native dependencies
-
 # ==============================================================================
 FROM quay.io/pypa/manylinux_2_28 AS base
 
@@ -56,18 +53,19 @@ ARG PIP_INDEX_URL
 ARG UV_INDEX_URL
 
 COPY ci/docker/shared/conan/remotes.json ${CONAN_HOME}/remotes.json
-COPY conanfile.py /tmp/conanfile.py
+COPY scripts/resources/package_for_linux/conan/profile.ini  ${CONAN_HOME}/profiles/default
 ARG UV_CACHE_DIR
 ARG PIP_CACHE_DIR
 ARG CONAN_CENTER_PROXY_V2_URL
 ARG CONAN_DOWNLOAD_CACHE=/tmp/conan_download_cache
-ARG UV_CONSTRAINT
-COPY ${UV_CONSTRAINT} /tmp/${UV_CONSTRAINT}
-ENV UV_CONSTRAINT=/tmp/${UV_CONSTRAINT}
+ENV UV_CONSTRAINT=/tmp/constraint.txt
 COPY scripts/resources/package_for_linux/conan/profile.ini  ${CONAN_HOME}/profiles/default
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=cache,target=${UV_CACHE_DIR} \
     --mount=type=cache,target=${CONAN_DOWNLOAD_CACHE} \
+    --mount=type=bind,source=uv.lock,target=/tmp/project/uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=/tmp/project/pyproject.toml \
+    uv export --frozen --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
     uvx --with cmake conan profile detect --exist-ok &&  \
     cp ${CONAN_HOME}/global.conf /tmp/global.conf.original && \
     echo "core.sources:download_cache = $CONAN_DOWNLOAD_CACHE" >> ${CONAN_HOME}/global.conf && \
@@ -103,5 +101,10 @@ RUN chmod -R 777 ${CONAN_USER_HOME} && \
     chmod -R 777 ${PIP_CACHE_DIR} && \
     mkdir -p ${UV_CACHE_DIR} && \
     chmod -R 777 ${UV_CACHE_DIR}
+
+COPY --chmod=755 scripts/resources/package_for_linux/build-wheel.sh /usr/bin/build-wheel
+#RUN  chmod +x /usr/bin/build-wheel
+#COPY scripts/resources/package_for_linux/fixup.awk /usr/bin/fixup.awk
+
 
 CMD ["build-wheel", "--help"]

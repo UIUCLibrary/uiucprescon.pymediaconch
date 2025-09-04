@@ -12,9 +12,9 @@ ARG CONAN_USER_HOME=/conan
 ARG CONAN_HOME=${CONAN_USER_HOME}/.conan2
 
 FROM ubuntu:24.04 AS base
-COPY ci/docker/linux/jenkins/apt-packages.txt /tmp/apt-packages.txt
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    --mount=type=bind,source=ci/docker/linux/jenkins/apt-packages.txt,target=/tmp/apt-packages.txt \
     rm -f /etc/apt/apt.conf.d/docker-clean && \
     apt-get update -y &&  \
     < /tmp/apt-packages.txt xargs apt-get install -y && \
@@ -29,10 +29,7 @@ RUN --mount=type=cache,target=/var/cache/apt \
     apt-get install -y --no-install-recommends jq && \
     rm -rf /var/lib/apt/lists/*
 ARG CONAN_HOME
-COPY requirements-dev.txt /tmp/requirements-dev.txt
 COPY ci/docker/shared/conan/remotes.json  ${CONAN_HOME}/remotes.json
-COPY conanfile.py /tmp/conanfile.py
-ARG PIP_EXTRA_INDEX_URL
 ARG PIP_INDEX_URL
 ARG CONAN_CENTER_PROXY_V2_URL
 ARG UV_CACHE_DIR
@@ -42,8 +39,12 @@ ARG CONAN_DOWNLOAD_CACHE=/tmp/conan_download_cache
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=cache,target=${UV_CACHE_DIR} \
     --mount=type=cache,target=${CONAN_DOWNLOAD_CACHE} \
+    --mount=type=bind,source=uv.lock,target=/tmp/project/uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=/tmp/project/pyproject.toml \
+    --mount=type=bind,source=conanfile.py,target=/tmp/conanfile.py \
     python3 -m venv venv && \
     ./venv/bin/pip --disable-pip-version-check install uv && \
+    ./venv/bin/uv export --frozen --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
     ./venv/bin/uvx --with cmake conan profile detect --exist-ok &&  \
     cp ${CONAN_HOME}/global.conf /tmp/global.conf.original && \
     echo "core.sources:download_cache = $CONAN_DOWNLOAD_CACHE" >> ${CONAN_HOME}/global.conf && \

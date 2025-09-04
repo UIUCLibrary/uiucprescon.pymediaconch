@@ -352,7 +352,7 @@ def windows_wheels(pythonVersions, testPackages, params, wheelStashes, sharedPip
                                                     unstash "python${pythonVersion} windows wheel"
                                                     findFiles(glob: 'dist/*.whl').each{
                                                         bat """python -m pip install --disable-pip-version-check uv
-                                                               uv export --frozen --only-dev --no-hashes > requirements-dev.txt
+                                                               uv export --frozen --only-dev --no-hashes > requirements-dev.txt ; `
                                                                uvx -p ${pythonVersion} --constraint requirements-dev.txt --with tox-uv tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
                                                             """
                                                     }

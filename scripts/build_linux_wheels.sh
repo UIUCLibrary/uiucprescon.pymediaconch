@@ -7,8 +7,6 @@ DEFAULT_PYTHON_VERSION="3.13"
 DOCKERFILE=$(realpath "$scriptDir/resources/package_for_linux/Dockerfile")
 DEFAULT_DOCKER_IMAGE_NAME="pymediaconch_builder"
 OUTPUT_PATH="$PROJECT_ROOT/dist"
-DEFAULT_BUILD_CONSTRAINTS="requirements-dev.txt"
-
 
 arch=$(uname -m)
 
@@ -28,8 +26,8 @@ esac
 generate_wheel(){
     platform=$1
     local docker_image_name_to_use=$2
-    local constraints_file=$3
-    local python_versions_to_use=("${@:4}")
+    local python_versions_to_use=("${@:3}")
+#    local constraints_file=$3
 
     docker build \
         -t "$docker_image_name_to_use" \
@@ -40,12 +38,8 @@ generate_wheel(){
         --build-arg PIP_INDEX_URL \
         --build-arg UV_EXTRA_INDEX_URL \
         --build-arg UV_INDEX_URL \
-        --build-arg UV_CONSTRAINT="$constraints_file" \
         "$PROJECT_ROOT"
-
-    mkdir -p "$OUTPUT_PATH"
-    echo "Building wheels for Python versions: ${python_versions_to_use[*]}"
-
+    mkdir -p "$output_path"
     docker run --rm \
         --platform="$platform" \
         -v "$PROJECT_ROOT":/project:ro \
@@ -72,10 +66,6 @@ show_help() {
   echo "  --docker-image-name                                                           "
   echo "                   : Name of the Docker image to use for building the wheel.    "
   echo "                   Defaults to \"$DEFAULT_DOCKER_IMAGE_NAME\".                  "
-  echo "  --build-constraints-file                                                      "
-  echo "                   : File to use for build constraints. This must be within the "
-  echo "                   root of the repository.                                      "
-  echo "                   Defaults to \"$DEFAULT_BUILD_CONSTRAINTS\"                   "
   echo "  --help, -h       : Display this help message.                                 "
 }
 
@@ -90,23 +80,6 @@ check_args(){
         echo "error: $PROJECT_ROOT contains no pyproject.toml"
         exit 1
     fi
-
-    if [[ "$build_constraints_file" = /* ]]; then
-      echo "The build constraints file '$build_constraints_file' cannot be an absolute path."
-      exit 1
-    fi
-
-    if [[ ! -f "$build_constraints_file" ]]; then
-      echo "No valid file found at $build_constraints_file"
-      exit 1
-    fi
-
-  # Check if the resolved path is within the source repository
-  if [[ ! $(realpath "$build_constraints_file") == "$PROJECT_ROOT"* ]]; then
-    echo "Error: The path '$build_constraints_file' is not within the source repository."
-    exit 1
-  fi
-
 
 }
 # === Main script starts here ===
@@ -132,13 +105,9 @@ while [[ "$#" -gt 0 ]]; do
       PROJECT_ROOT="$2"
       shift 2
       ;;
-    --build-constraints-file=*)
-      build_constraints_file="${1#*=}"
-      shift
-      ;;
-    --build-constraints-file)
-      build_constraints_file="${2}"
-      shift 2
+    --verify)
+      verify=1
+      shift 1
       ;;
     --docker-image-name=*)
       docker_image_name="${1#*=}"
@@ -198,10 +167,5 @@ if [[ ! -v docker_image_name ]]; then
 else
   echo "Using '$docker_image_name' for the name of the Docker Image generated to build."
 fi
-if [[ -z "$build_constraints_file" ]]; then
-    build_constraints_file=$DEFAULT_BUILD_CONSTRAINTS
-else
-  echo "Using '$build_constraints_file' for constraints file."
-fi
 check_args
-generate_wheel "$PLATFORM" "$docker_image_name" "$build_constraints_file" "${python_versions[@]}"
+generate_wheel "$PLATFORM" "$docker_image_name" "${python_versions[@]}"

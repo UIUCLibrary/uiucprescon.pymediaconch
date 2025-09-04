@@ -116,19 +116,13 @@ done
 
 source_directory="$1"
 output_directory="$2"
-build_constraints="$3"
-python_versions_to_use=("${@:4}")
+python_versions_to_use=("${@:3}")
 
-
-if [ ! -f "${source_directory}/$build_constraints" ]; then
-  echo "Error: File '$build_constraints' does not exist or is not a regular file."
-  exit 1
-fi
-
+build_constraints=/tmp/constraints.txt
 echo "Building wheels for Python versions: ${python_versions_to_use[*]}"
 make_shadow_copy "$source_directory" "$WORKSPACE"
-
-make_wheels "$WORKSPACE" "/tmp/dist" "${WORKSPACE}/${build_constraints}" "${python_versions_to_use[@]}"
-verify_package_with_twine "/tmp/dist" "${WORKSPACE}/${build_constraints}"
+uv export --frozen --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "${WORKSPACE}" > $build_constraints
+make_wheels "$WORKSPACE" "/tmp/dist" "${build_constraints}" "${python_versions_to_use[@]}"
+verify_package_with_twine "/tmp/dist" "${build_constraints}"
 fix_up_wheels "/tmp/dist" "${output_directory}"
 echo 'Done'
