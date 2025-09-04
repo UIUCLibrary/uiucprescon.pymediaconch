@@ -48,7 +48,7 @@ ARG CONAN_DOWNLOAD_CACHE=/tmp/conan_download_cache
 COPY ci/docker/shared/conan/remotes.json  ${CONAN_HOME}/remotes.json
 COPY ci/docker/linux/tox/conan/profile.ini ${CONAN_HOME}/profiles/default
 COPY conanfile.py /tmp/conanfile.py
-ENV UV_CONSTRAINT=/tmp/requirements/requirements-dev.txt
+ENV UV_CONSTRAINT=/tmp/constrainsts.txt
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=cache,target=${UV_CACHE_DIR} \
     --mount=type=cache,target=${CONAN_DOWNLOAD_CACHE} \
