@@ -121,7 +121,7 @@ python_versions_to_use=("${@:3}")
 build_constraints=/tmp/constraints.txt
 echo "Building wheels for Python versions: ${python_versions_to_use[*]}"
 make_shadow_copy "$source_directory" "$WORKSPACE"
-uv export --frozen --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory ${WORKSPACE} > $build_constraints
+uv export --frozen --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "${WORKSPACE}" > $build_constraints
 make_wheels "$WORKSPACE" "/tmp/dist" "${build_constraints}" "${python_versions_to_use[@]}"
 verify_package_with_twine "/tmp/dist" "${build_constraints}"
 fix_up_wheels "/tmp/dist" "${output_directory}"
