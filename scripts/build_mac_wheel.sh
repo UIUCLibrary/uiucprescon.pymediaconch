@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 INSTALLED_UV=$(command -v uv)
 DEFAULT_BASE_PYTHON="python3"
-REQUIREMENTS_FILE="requirements-dev.txt"
+REQUIREMENTS_FILE="$(mktemp -d)"/requirements-dev.txt
 set -e
 
 verify_package_with_twine() {
@@ -120,5 +120,5 @@ if [[ ! -f "$INSTALLED_UV" ]]; then
 else
     uv=$INSTALLED_UV
 fi
-
+"$uv" export --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory ${project_root} > $REQUIREMENTS_FILE
 generate_wheel_with_uv "$uv" "$project_root" "$python_version"
