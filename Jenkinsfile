@@ -422,17 +422,16 @@ pipeline {
                                     steps{
                                         retry(3){
                                             script{
-                                                try{
-                                                    sh(
-                                                        label: 'Create virtual environment',
-                                                        script: '''python3 -m venv bootstrap_uv
-                                                                   bootstrap_uv/bin/pip install --disable-pip-version-check uv
-                                                                   bootstrap_uv/bin/uv venv venv
-                                                                   . ./venv/bin/activate
-                                                                   bootstrap_uv/bin/uv pip install --index-strategy unsafe-best-match uv
-                                                                   rm -rf bootstrap_uv
-                                                                   uv pip install --index-strategy unsafe-best-match -r requirements-dev.txt
-                                                                   '''
+                                                sh(
+                                                    label: 'Create virtual environment',
+                                                    script: '''python3 -m venv --clear bootstrap_uv
+                                                               trap "rm -rf bootstrap_uv" EXIT
+                                                               bootstrap_uv/bin/pip install --disable-pip-version-check uv
+                                                               bootstrap_uv/bin/uv venv  --python-preference=only-system  venv
+                                                               . ./venv/bin/activate
+                                                               bootstrap_uv/bin/uv sync --locked --group dev --active
+                                                               bootstrap_uv/bin/uv pip install uv --python venv
+                                                            '''
                                                    )
                                                 } catch(e){
                                                     cleanWs(
