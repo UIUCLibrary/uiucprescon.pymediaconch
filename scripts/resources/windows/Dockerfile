@@ -81,7 +81,7 @@ COPY uv.lock pyproject.toml c:/temp/project/
 COPY conanfile.py c:/temp/conanfile.py
 ENV UV_CONSTRAINT=c:/temp/requirements-dev.txt
 ARG CONAN_CENTER_PROXY_V2_URL
-RUN uv export --only-dev --no-hashes --directory c:/temp/project/ > ${Env:UV_CONSTRAINT} ; `
+RUN uv export --frozen --only-dev --no-hashes --directory c:/temp/project/ > ${Env:UV_CONSTRAINT} ; `
     uvx --with cmake conan profile detect --exist-ok ; `
     if (${env:CONAN_CENTER_PROXY_V2_URL} -ne $(Get-Content -Raw -Path ${Env:CONAN_HOME}\remotes.json)) { `
           Copy-Item -Path "${Env:CONAN_HOME}\remotes.json" -Destination "c:\remotes.json" ; `

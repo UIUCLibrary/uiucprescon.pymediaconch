@@ -44,7 +44,7 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=bind,source=conanfile.py,target=/tmp/conanfile.py \
     python3 -m venv venv && \
     ./venv/bin/pip --disable-pip-version-check install uv && \
-    ./venv/bin/uv export --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
+    ./venv/bin/uv export --frozen --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
     ./venv/bin/uvx --with cmake conan profile detect --exist-ok &&  \
     cp ${CONAN_HOME}/global.conf /tmp/global.conf.original && \
     echo "core.sources:download_cache = $CONAN_DOWNLOAD_CACHE" >> ${CONAN_HOME}/global.conf && \
