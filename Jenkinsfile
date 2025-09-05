@@ -799,9 +799,9 @@ pipeline {
             when{
                 equals expected: true, actual: params.BUILD_PACKAGES
             }
-            environment{
-                UV_BUILD_CONSTRAINT='requirements-dev.txt'
-            }
+//             environment{
+//                 UV_BUILD_CONSTRAINT='requirements-dev.txt'
+//             }
             failFast true
             parallel{
                 stage('Platform Wheels: Linux'){
