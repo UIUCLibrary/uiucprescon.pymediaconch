@@ -63,7 +63,8 @@ generate_wheel_with_uv(){
             echo ""
             echo "================================================================================"
           else
-            echo "${file} is not linked to anything"
+            file_name=$(basename "$file")
+            echo "$file_name is not linked to anything"
           fi
           $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$REQUIREMENTS_FILE" --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "${file}"
 
@@ -139,4 +140,5 @@ else
     uv=$INSTALLED_UV
 fi
 "$uv" export --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "${project_root}" > "$REQUIREMENTS_FILE"
+cat "$REQUIREMENTS_FILE"
 generate_wheel_with_uv "$uv" "$project_root" "$python_version"
