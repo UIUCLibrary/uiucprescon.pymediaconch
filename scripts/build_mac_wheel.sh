@@ -49,19 +49,34 @@ generate_wheel_with_uv(){
     out_temp_wheels_dir=$(mktemp -d /tmp/python_wheels.XXXXXX)
     output_path="./dist"
     trap 'rm -rf $out_temp_wheels_dir' ERR SIGINT SIGTERM RETURN
-    UV_INDEX_STRATEGY=unsafe-best-match _PYTHON_HOST_PLATFORM=$_PYTHON_HOST_PLATFORM MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET ARCHFLAGS=$ARCHFLAGS $uv build --python="$pythonVersion" --build-constraints $REQUIREMENTS_FILE --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
+    UV_INDEX_STRATEGY=unsafe-best-match _PYTHON_HOST_PLATFORM=$_PYTHON_HOST_PLATFORM MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET ARCHFLAGS=$ARCHFLAGS $uv build --python="$pythonVersion" --build-constraints "$REQUIREMENTS_FILE" --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
     verify_package_with_twine "$out_temp_wheels_dir" "${REQUIREMENTS_FILE}"
-    pattern="$out_temp_wheels_dir/*.whl"
-    files=( "$pattern" )
-    undelocate_wheel="${files[0]}"
+    search_pattern="$out_temp_wheels_dir/*.whl"
+    for file in $search_pattern; do
+          results=$("$uv" tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$REQUIREMENTS_FILE" --from=delocate delocate-listdeps --depending "${file}")
+          if [ -n "$results" ]; then
+            echo ""
+            echo "================================================================================"
+            echo "${file} is linked to the following:"
+            echo "$results"
+            echo ""
+            echo "================================================================================"
+          fi
+            $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$REQUIREMENTS_FILE" --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "${file}"
 
-    echo ""
-    echo "================================================================================"
-    echo "${undelocate_wheel} is linked to the following:"
-    $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-listdeps --depending "${undelocate_wheel}"
-    echo ""
-    echo "================================================================================"
-    $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "$undelocate_wheel"
+    done
+#    pattern="$out_temp_wheels_dir/*.whl"
+#    files=( "$pattern" )
+#    echo "Wheels ${files[*]}"
+#    undelocate_wheel="${files[0]}"
+#
+#    echo ""
+#    echo "================================================================================"
+#    echo "${undelocate_wheel} is linked to the following:"
+#    $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-listdeps --depending "${undelocate_wheel}"
+#    echo ""
+#    echo "================================================================================"
+#    $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "$undelocate_wheel"
 }
 
 print_usage(){
@@ -120,5 +135,5 @@ if [[ ! -f "$INSTALLED_UV" ]]; then
 else
     uv=$INSTALLED_UV
 fi
-"$uv" export --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory ${project_root} > $REQUIREMENTS_FILE
+"$uv" export --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "${project_root}" > "$REQUIREMENTS_FILE"
 generate_wheel_with_uv "$uv" "$project_root" "$python_version"
