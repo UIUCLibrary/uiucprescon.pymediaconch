@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 INSTALLED_UV=$(command -v uv)
 DEFAULT_BASE_PYTHON="python3"
-REQUIREMENTS_FILE="$(mktemp -d)"/requirements-dev.txt
+REQUIREMENTS_FILE="$(mktemp -d)/requirements-dev.txt"
 set -e
 
 verify_package_with_twine() {
