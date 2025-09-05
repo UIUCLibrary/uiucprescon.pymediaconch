@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 INSTALLED_UV=$(command -v uv)
 DEFAULT_BASE_PYTHON="python3"
-REQUIREMENTS_FILE="$(mktemp -d)/requirements-dev.txt"
+REQUIREMENTS_FILE="$(mktemp -d)/constraints.txt"
 set -e
 
 verify_package_with_twine() {
@@ -20,6 +20,7 @@ generate_wheel_with_uv(){
     uv=$1
     project_root=$2
     pythonVersion=$3
+    constraints=$4
 
     # Get the processor type
     processor_type=$(uname -m)
@@ -49,12 +50,12 @@ generate_wheel_with_uv(){
     out_temp_wheels_dir=$(mktemp -d /tmp/python_wheels.XXXXXX)
     output_path="./dist"
     trap 'rm -rf $out_temp_wheels_dir' ERR SIGINT SIGTERM RETURN
-    UV_INDEX_STRATEGY=unsafe-best-match _PYTHON_HOST_PLATFORM=$_PYTHON_HOST_PLATFORM MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET ARCHFLAGS=$ARCHFLAGS $uv build --python="$pythonVersion" --build-constraints "$REQUIREMENTS_FILE" --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
-    verify_package_with_twine "$out_temp_wheels_dir" "${REQUIREMENTS_FILE}"
+    UV_INDEX_STRATEGY=unsafe-best-match _PYTHON_HOST_PLATFORM=$_PYTHON_HOST_PLATFORM MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET ARCHFLAGS=$ARCHFLAGS $uv build --python="$pythonVersion" --build-constraints "$constraints" --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
+    verify_package_with_twine "$out_temp_wheels_dir" "${constraints}"
     search_pattern="$out_temp_wheels_dir/*.whl"
     echo 'Fixing up wheel'
     for file in $search_pattern; do
-          results=$("$uv" tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$REQUIREMENTS_FILE" --from=delocate delocate-listdeps --depending "${file}")
+          results=$("$uv" tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$constraints" --from=delocate delocate-listdeps --depending "${file}")
           if [ -n "$results" ]; then
             echo ""
             echo "================================================================================"
@@ -66,7 +67,7 @@ generate_wheel_with_uv(){
             file_name=$(basename "$file")
             echo "$file_name is not linked to anything"
           fi
-          $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$REQUIREMENTS_FILE" --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "${file}"
+          $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$constraints" --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "${file}"
 
     done
 #    pattern="$out_temp_wheels_dir/*.whl"
@@ -141,4 +142,4 @@ else
 fi
 "$uv" export --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "${project_root}" > "$REQUIREMENTS_FILE"
 cat "$REQUIREMENTS_FILE"
-generate_wheel_with_uv "$uv" "$project_root" "$python_version"
+generate_wheel_with_uv "$uv" "$project_root" "$python_version" "$REQUIREMENTS_FILE"
