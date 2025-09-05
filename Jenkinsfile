@@ -108,6 +108,7 @@ def linux_wheels(pythonVersions, testPackages, params, wheelStashes){
                                                                                        . ./venv/bin/activate
                                                                                        trap "rm -rf venv" EXIT
                                                                                        pip install --disable-pip-version-check uv
+                                                                                       uv export --frozen --only-dev --no-hashes > requirements-dev.txt
                                                                                        uvx --constraint requirements-dev.txt --with tox-uv tox -e py${pythonVersion.replace('.', '')} --installpkg ${findFiles(glob:'dist/*.whl')[0].path} -vv
                                                                                     """
                                                                         )
@@ -672,6 +673,7 @@ pipeline {
                                                                         try{
                                                                             sh( label: 'Running Tox',
                                                                                 script: """python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv
+                                                                                           venv/bin/uv export --frozen --only-dev --no-hashes > requirements-dev.txt
                                                                                            venv/bin/uvx --python ${version} --python-preference system --with tox-uv tox run -e ${toxEnv} -vv
                                                                                         """
                                                                                 )
@@ -725,7 +727,7 @@ pipeline {
                                                         "--mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} " +
                                                         "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                 ){
-                                                 bat(script: 'python -m venv venv && venv\\Scripts\\pip install --disable-pip-version-check uv')
+                                                 bat(script: 'python -m venv venv && venv\\Scripts\\pip install --disable-pip-version-check uv && venv\\Scripts\\uv export --frozen --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate > requirements-dev.txt')
                                                  envs = bat(
                                                      label: 'Get tox environments',
                                                      script: '@.\\venv\\Scripts\\uvx --quiet --constraint=requirements-dev.txt --with-requirements requirements-dev.txt --with tox-uv tox list -d --no-desc',
@@ -762,6 +764,7 @@ pipeline {
                                                                         try{
                                                                             bat(label: 'Running Tox',
                                                                                 script: """uv python install cpython-${version}
+                                                                                           uv export --frozen --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate > requirements-dev.txt
                                                                                            uvx -p ${version} --constraint=requirements-dev.txt --with tox-uv tox run -e ${toxEnv} -vv
                                                                                         """
                                                                             )
