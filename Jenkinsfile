@@ -183,6 +183,7 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                                                                     sh(label: 'Running Tox',
                                                                        script: """python${pythonVersion} -m venv venv
                                                                        ./venv/bin/python -m pip install --disable-pip-version-check uv
+                                                                       ./venv/bin/uv export --frozen --only-dev --no-hashes > requirements-dev.txt
                                                                        ./venv/bin/uvx --constraint=requirements-dev.txt --with tox_uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
                                                                     )
                                                                 }
@@ -253,6 +254,7 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                                                                               trap "rm -rf venv" EXIT
                                                                               ./venv/bin/python -m pip install --disable-pip-version-check uv
                                                                               trap "rm -rf venv && rm -rf .tox" EXIT
+                                                                              ./venv/bin/uv export --frozen --only-dev --no-hashes > requirements-dev.txt
                                                                               ./venv/bin/uvx --python=${pythonVersion} --constraint=requirements-dev.txt --with tox-uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
                                                                            """
                                                                 )
