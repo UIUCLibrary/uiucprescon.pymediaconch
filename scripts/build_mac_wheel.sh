@@ -52,6 +52,7 @@ generate_wheel_with_uv(){
     UV_INDEX_STRATEGY=unsafe-best-match _PYTHON_HOST_PLATFORM=$_PYTHON_HOST_PLATFORM MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET ARCHFLAGS=$ARCHFLAGS $uv build --python="$pythonVersion" --build-constraints "$REQUIREMENTS_FILE" --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
     verify_package_with_twine "$out_temp_wheels_dir" "${REQUIREMENTS_FILE}"
     search_pattern="$out_temp_wheels_dir/*.whl"
+    echo 'Fixing up wheel'
     for file in $search_pattern; do
           results=$("$uv" tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$REQUIREMENTS_FILE" --from=delocate delocate-listdeps --depending "${file}")
           if [ -n "$results" ]; then
@@ -61,8 +62,10 @@ generate_wheel_with_uv(){
             echo "$results"
             echo ""
             echo "================================================================================"
+          else
+            echo "${file} is not linked to anything"
           fi
-            $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$REQUIREMENTS_FILE" --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "${file}"
+          $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$REQUIREMENTS_FILE" --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "${file}"
 
     done
 #    pattern="$out_temp_wheels_dir/*.whl"
