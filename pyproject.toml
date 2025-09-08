@@ -26,10 +26,6 @@ readme = {file = "README.md", content-type = "text/markdown"}
 packages = ["uiucprescon.pymediaconch"]
 package-dir = {"" = "src"}
 
-[tool.pytest.ini_options]
-pythonpath = [
-    "src"
-]
 [tool.commitizen]
 name = "cz_conventional_commits"
 tag_format = "v$major.$minor.$patch${prerelease}"
