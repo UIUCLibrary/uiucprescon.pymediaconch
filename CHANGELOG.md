@@ -1,3 +1,14 @@
+## v0.1.1 (2025-09-09)
+
+### Feat
+
+- MediaConch class now accepts keyword arguments for all public methods
+- packaged with Type information
+
+### Fix
+
+- add __init__.py
+
 ## v0.1.0 (2025-08-28)
 
 ### Feat

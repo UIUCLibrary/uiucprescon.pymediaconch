@@ -9,7 +9,7 @@ build-backend = "uiucprescon.build"
 
 [project]
 name = "uiucprescon.pymediaconch"
-version = "0.1.1.dev0"
+version = "0.1.1"
 requires-python = '>=3.9'
 license = "NCSA"
 license-files = ["LICENSE"]
