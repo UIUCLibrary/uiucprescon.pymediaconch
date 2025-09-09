@@ -8,29 +8,14 @@ Development environment
 
 Set up development environment on Mac and Linux
 
-Using UV instead of pip
------------------------
+The only prereq is that uv is installed.
 
-This way is better and faster than using pip.
 
 .. code-block:: shell-session
 
-    user@DEVMACHINE123 % uv venv
-    user@DEVMACHINE123 % source ./venv/bin/activate
-    (venv) user@DEVMACHINE123 % uv pip sync requirements-dev.txt
-    (venv) user@DEVMACHINE123 % uv pip install -e .
-
-Using pip
----------
-
-If you don't have uv installed:
-
-.. code-block:: shell-session
-
-    user@DEVMACHINE123 % python -m venv .venv
+    user@DEVMACHINE123 % uv sync --group dev
     user@DEVMACHINE123 % source .venv/bin/activate
-    (venv) user@DEVMACHINE123 % pip install -r requirements-dev.txt
-    (venv) user@DEVMACHINE123 % pip install -e .
+
 
 -------------
 Running tests
