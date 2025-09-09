@@ -59,12 +59,12 @@ ARG PIP_CACHE_DIR
 ARG CONAN_CENTER_PROXY_V2_URL
 ARG CONAN_DOWNLOAD_CACHE=/tmp/conan_download_cache
 ENV UV_CONSTRAINT=/tmp/constraint.txt
-COPY scripts/resources/package_for_linux/conan/profile.ini  ${CONAN_HOME}/profiles/default
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=cache,target=${UV_CACHE_DIR} \
     --mount=type=cache,target=${CONAN_DOWNLOAD_CACHE} \
     --mount=type=bind,source=uv.lock,target=/tmp/project/uv.lock \
     --mount=type=bind,source=pyproject.toml,target=/tmp/project/pyproject.toml \
+    --mount=type=bind,source=conanfile.py,target=/tmp/conanfile.py \
     uv export --frozen --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
     uvx --with cmake conan profile detect --exist-ok &&  \
     cp ${CONAN_HOME}/global.conf /tmp/global.conf.original && \
@@ -83,9 +83,6 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
 # ==============================================================================
 
 FROM base
-COPY scripts/resources/package_for_linux/build-wheel.sh /usr/bin/build-wheel
-RUN  chmod +x /usr/bin/build-wheel
-
 ARG CONAN_USER_HOME
 ARG CONAN_HOME
 COPY --from=conan_builder ${CONAN_HOME}/ ${CONAN_HOME}/

@@ -26,8 +26,8 @@ esac
 generate_wheel(){
     platform=$1
     local docker_image_name_to_use=$2
-    local python_versions_to_use=("${@:3}")
-#    local constraints_file=$3
+    local output_path=$3
+    local python_versions_to_use=("${@:4}")
 
     docker build \
         -t "$docker_image_name_to_use" \
@@ -43,11 +43,28 @@ generate_wheel(){
     docker run --rm \
         --platform="$platform" \
         -v "$PROJECT_ROOT":/project:ro \
-        -v "$OUTPUT_PATH":/dist \
+        --mount type=bind,src="$(realpath "$output_path")",dst=/dist \
         "$docker_image_name_to_use" \
-        build-wheel /project /dist "$constraints_file" "${python_versions_to_use[@]}"
-    echo "Built wheel can be found in '$OUTPUT_PATH'"
+        build-wheel /project /dist "${python_versions_to_use[@]}"
 }
+
+test_wheels(){
+    local manifest_tsv=$1
+    local wheel_path=$2
+    local source_path=$3
+    awk -F'\t' '
+    {
+      if($1 && $2){
+        print "Testing "$1 " with tox"
+        wheel_outside = wheel_path "/" $1
+        wheel_inside = "/test_env/dist/" $1
+        system("docker run --user $(id -u):$(id -g) --rm -v " source_path "/tox.ini:/test_env/tox.ini -v " source_path "/pyproject.toml:/test_env/pyproject.toml -v " source_path "/tests/:/test_env/tests/ -v " wheel_outside ":" wheel_inside " --workdir /test_env/ --entrypoint=\"/bin/bash\" python -c \"python -m venv /venv && /venv/bin/pip install --disable-pip-version-check uv && /venv/bin/uvx --with tox-uv tox run -e " $2 " --installpkg " wheel_inside " \" ")
+      }
+    }
+    ' wheel_path="$(realpath "$wheel_path")" source_path="$(realpath "$source_path")" "$manifest_tsv"
+}
+
+
 print_usage(){
     echo "Usage: $0 [--project-root[=PROJECT_ROOT]] [--python-version[=PYTHON_VERSION]] [--help]"
 }
@@ -93,6 +110,8 @@ for arg in "$@"; do
     exit 0
   fi
 done
+
+verify=0
 
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
@@ -168,4 +187,16 @@ else
   echo "Using '$docker_image_name' for the name of the Docker Image generated to build."
 fi
 check_args
-generate_wheel "$PLATFORM" "$docker_image_name" "${python_versions[@]}"
+mkdir -p build
+temp_dir="$(mktemp -d build/pymediaconch_wheels_XXXXXX)"
+trap 'rm -rf $temp_dir' EXIT
+
+generate_wheel "$PLATFORM" "$docker_image_name" "$temp_dir" "${python_versions[@]}"
+
+if (( verify )); then
+  test_wheels "${temp_dir}/output.tsv" "$temp_dir" "$PROJECT_ROOT"
+fi
+
+mkdir -p "$OUTPUT_PATH"
+mv "${temp_dir}"/*.whl "${OUTPUT_PATH}/"
+echo "Built wheel can be found in '$OUTPUT_PATH'"
