@@ -836,7 +836,7 @@ pipeline {
                                 docker{
                                     image 'python'
                                     label 'linux && docker'
-                                    args '--mount source=python-tmp-uiucpreson-imagevalidate,target=/tmp'
+                                    args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'
                                   }
                             }
                             environment{
