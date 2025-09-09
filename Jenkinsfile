@@ -24,6 +24,8 @@ def SUPPORTED_LINUX_VERSIONS = [
     '3.13'
 ]
 
+def retryTimes = 3
+
 def wheelStashes = []
 
 def getPypiConfig(pypiConfigId) {
@@ -39,7 +41,7 @@ def getPypiConfig(pypiConfigId) {
     }
 }
 
-def linux_wheels(pythonVersions, testPackages, params, wheelStashes){
+def linux_wheels(pythonVersions, testPackages, params, wheelStashes, retryTimes){
     def selectedArches = []
     def allValidArches = [
         // Arm64 on linux won't build libcurl
@@ -54,7 +56,6 @@ def linux_wheels(pythonVersions, testPackages, params, wheelStashes){
     }
     parallel([failFast: true] << pythonVersions.collectEntries{ pythonVersion ->
         def newVersionStage = "Python ${pythonVersion} - Linux"
-        def retryTimes = 3
         return [
             "${newVersionStage}": {
                 stage(newVersionStage){
@@ -133,7 +134,7 @@ def linux_wheels(pythonVersions, testPackages, params, wheelStashes){
     })
 }
 
-def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
+def mac_wheels(pythonVersions, testPackages, params, wheelStashes, retryTimes){
     def selectedArches = []
     def allValidArches = ['arm64', 'x86_64']
     if(params.INCLUDE_MACOS_X86_64 == true){
@@ -203,7 +204,7 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                     if(params.INCLUDE_MACOS_X86_64 && params.INCLUDE_MACOS_ARM){
                         stage("Universal2 Wheel: Python ${pythonVersion}"){
                             stage('Make Universal2 wheel'){
-                                retry(3){
+                                retry(retryTimes){
                                     node("mac && python${pythonVersion}") {
                                         checkout scm
                                         try{
@@ -241,7 +242,7 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
                                         archStages["Test Python ${pythonVersion} universal2 Wheel on ${arch} mac"] = {
                                             node("mac && python${pythonVersion}") {
                                                 checkout scm
-                                                retry(3){
+                                                retry(retryTimes){
                                                     try{
                                                         unstash "python${pythonVersion} mac-universal2 wheel"
                                                         findFiles(glob: 'dist/*.whl').each{
@@ -283,7 +284,7 @@ def mac_wheels(pythonVersions, testPackages, params, wheelStashes){
         ]}
     )
 }
-def windows_wheels(pythonVersions, testPackages, params, wheelStashes, sharedPipCacheVolumeName){
+def windows_wheels(pythonVersions, testPackages, params, wheelStashes, retryTimes, sharedPipCacheVolumeName){
     parallel([failFast: true] << pythonVersions.collectEntries{ pythonVersion ->
         def newStage = "Python ${pythonVersion} - Windows"
         [
@@ -296,7 +297,7 @@ def windows_wheels(pythonVersions, testPackages, params, wheelStashes, sharedPip
                                 try{
                                     checkout scm
                                     try{
-                                        retry(3){
+                                        retry(retryTimes){
                                             try{
                                                 powershell(label: 'Building Wheel for Windows', script: "scripts/build_windows.ps1 -PythonVersion ${pythonVersion} -DockerImageName ${dockerImageName}")
                                             } catch(e){
@@ -337,7 +338,7 @@ def windows_wheels(pythonVersions, testPackages, params, wheelStashes, sharedPip
                                         'UV_PYTHON_INSTALL_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
                                         'UV_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvcache',
                                     ]){
-                                        retry(2){
+                                        retry(retryTimes){
                                             checkout scm
                                             try{
                                                 docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside("--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython --mount source=msvc-runtime,target=c:\\msvc_runtime --mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
@@ -417,7 +418,7 @@ pipeline {
                             stages{
                                 stage('Setup Testing Environment'){
                                     steps{
-                                        retry(3){
+                                        retry(retryTimes){
                                             script{
                                                 try{
                                                     sh(
@@ -652,16 +653,15 @@ pipeline {
                                                     node('docker && linux && x86_64'){
                                                         checkout scm
                                                         def image
-                                                        def maxRetries = 3
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
-                                                            retry(maxRetries){
+                                                            retry(retryTimes){
                                                                 image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL .')
                                                             }
                                                         }
                                                         try{
                                                             try{
                                                                 image.inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'){
-                                                                    retry(maxRetries){
+                                                                    retry(retryTimes){
                                                                         try{
                                                                             sh( label: 'Running Tox',
                                                                                 script: """python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv
@@ -736,11 +736,10 @@ pipeline {
                                                  "Tox Environment: ${toxEnv}",
                                                  {
                                                      node('docker && windows'){
-                                                        def maxRetries = 3
                                                         def image
                                                         checkout scm
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
-                                                            retry(maxRetries){
+                                                            retry(retryTimes){
                                                                 image = docker.build(UUID.randomUUID().toString(), '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
                                                             }
                                                         }
@@ -751,7 +750,7 @@ pipeline {
                                                                              "--mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} " +
                                                                              "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                                 ){
-                                                                    retry(maxRetries){
+                                                                    retry(retryTimes){
                                                                         try{
                                                                             bat(label: 'Running Tox',
                                                                                 script: """uv python install cpython-${version}
@@ -808,7 +807,7 @@ pipeline {
                         }
                     }
                     steps{
-                        linux_wheels(SUPPORTED_LINUX_VERSIONS, params.TEST_PACKAGES, params, wheelStashes)
+                        linux_wheels(SUPPORTED_LINUX_VERSIONS, params.TEST_PACKAGES, params, wheelStashes, retryTimes)
                     }
                 }
                 stage('Platform Wheels: Mac'){
@@ -819,7 +818,7 @@ pipeline {
                         }
                     }
                     steps{
-                        mac_wheels(SUPPORTED_MAC_VERSIONS, params.TEST_PACKAGES, params, wheelStashes)
+                        mac_wheels(SUPPORTED_MAC_VERSIONS, params.TEST_PACKAGES, params, wheelStashes, retryTimes)
                     }
                 }
                 stage('Platform Wheels: Windows'){
@@ -827,7 +826,7 @@ pipeline {
                         equals expected: true, actual: params.INCLUDE_WINDOWS_X86_64
                     }
                     steps{
-                        windows_wheels(SUPPORTED_WINDOWS_VERSIONS, params.TEST_PACKAGES, params, wheelStashes, SHARED_PIP_CACHE_VOLUME_NAME)
+                        windows_wheels(SUPPORTED_WINDOWS_VERSIONS, params.TEST_PACKAGES, params, wheelStashes, retryTimes, SHARED_PIP_CACHE_VOLUME_NAME)
                     }
                 }
                 stage('Source Distribution Package'){
@@ -932,7 +931,7 @@ pipeline {
                                                 "${newStageName}": {
                                                     stage(newStageName){
                                                         if(selectedArches.contains(arch)){
-                                                            retry(2){
+                                                            retry(retryTimes){
                                                                 node("windows && docker && ${arch}"){
                                                                     def dockerImage
                                                                     try{
@@ -1098,7 +1097,7 @@ pipeline {
                         beforeInput true
                     }
                     options{
-                        retry(3)
+                        retry(retryTimes)
                     }
                     input {
                         message 'Upload to pypi server?'
