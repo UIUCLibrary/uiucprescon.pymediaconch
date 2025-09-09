@@ -7,8 +7,6 @@ DEFAULT_PYTHON_VERSION="3.13"
 DOCKERFILE=$(realpath "$scriptDir/resources/package_for_linux/Dockerfile")
 DEFAULT_DOCKER_IMAGE_NAME="pymediaconch_builder"
 OUTPUT_PATH="$PROJECT_ROOT/dist"
-DEFAULT_BUILD_CONSTRAINTS="requirements-dev.txt"
-
 
 arch=$(uname -m)
 
@@ -28,7 +26,7 @@ esac
 generate_wheel(){
     platform=$1
     local docker_image_name_to_use=$2
-    local constraints_file=$3
+    local output_path=$3
     local python_versions_to_use=("${@:4}")
 
     docker build \
@@ -40,20 +38,33 @@ generate_wheel(){
         --build-arg PIP_INDEX_URL \
         --build-arg UV_EXTRA_INDEX_URL \
         --build-arg UV_INDEX_URL \
-        --build-arg UV_CONSTRAINT="$constraints_file" \
         "$PROJECT_ROOT"
-
-    mkdir -p "$OUTPUT_PATH"
-    echo "Building wheels for Python versions: ${python_versions_to_use[*]}"
-
+    mkdir -p "$output_path"
     docker run --rm \
         --platform="$platform" \
         -v "$PROJECT_ROOT":/project:ro \
-        -v "$OUTPUT_PATH":/dist \
+        --mount type=bind,src="$(realpath "$output_path")",dst=/dist \
         "$docker_image_name_to_use" \
-        build-wheel /project /dist "$constraints_file" "${python_versions_to_use[@]}"
-    echo "Built wheel can be found in '$OUTPUT_PATH'"
+        build-wheel /project /dist "${python_versions_to_use[@]}"
 }
+
+test_wheels(){
+    local manifest_tsv=$1
+    local wheel_path=$2
+    local source_path=$3
+    awk -F'\t' '
+    {
+      if($1 && $2){
+        print "Testing "$1 " with tox"
+        wheel_outside = wheel_path "/" $1
+        wheel_inside = "/test_env/dist/" $1
+        system("docker run --user $(id -u):$(id -g) --rm -v " source_path "/tox.ini:/test_env/tox.ini -v " source_path "/pyproject.toml:/test_env/pyproject.toml -v " source_path "/tests/:/test_env/tests/ -v " wheel_outside ":" wheel_inside " --workdir /test_env/ --entrypoint=\"/bin/bash\" python -c \"python -m venv /venv && /venv/bin/pip install --disable-pip-version-check uv && /venv/bin/uvx --with tox-uv tox run -e " $2 " --installpkg " wheel_inside " \" ")
+      }
+    }
+    ' wheel_path="$(realpath "$wheel_path")" source_path="$(realpath "$source_path")" "$manifest_tsv"
+}
+
+
 print_usage(){
     echo "Usage: $0 [--project-root[=PROJECT_ROOT]] [--python-version[=PYTHON_VERSION]] [--help]"
 }
@@ -72,10 +83,6 @@ show_help() {
   echo "  --docker-image-name                                                           "
   echo "                   : Name of the Docker image to use for building the wheel.    "
   echo "                   Defaults to \"$DEFAULT_DOCKER_IMAGE_NAME\".                  "
-  echo "  --build-constraints-file                                                      "
-  echo "                   : File to use for build constraints. This must be within the "
-  echo "                   root of the repository.                                      "
-  echo "                   Defaults to \"$DEFAULT_BUILD_CONSTRAINTS\"                   "
   echo "  --help, -h       : Display this help message.                                 "
 }
 
@@ -91,23 +98,6 @@ check_args(){
         exit 1
     fi
 
-    if [[ "$build_constraints_file" = /* ]]; then
-      echo "The build constraints file '$build_constraints_file' cannot be an absolute path."
-      exit 1
-    fi
-
-    if [[ ! -f "$build_constraints_file" ]]; then
-      echo "No valid file found at $build_constraints_file"
-      exit 1
-    fi
-
-  # Check if the resolved path is within the source repository
-  if [[ ! $(realpath "$build_constraints_file") == "$PROJECT_ROOT"* ]]; then
-    echo "Error: The path '$build_constraints_file' is not within the source repository."
-    exit 1
-  fi
-
-
 }
 # === Main script starts here ===
 
@@ -121,6 +111,8 @@ for arg in "$@"; do
   fi
 done
 
+verify=0
+
 # Parse optional arguments
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -132,13 +124,9 @@ while [[ "$#" -gt 0 ]]; do
       PROJECT_ROOT="$2"
       shift 2
       ;;
-    --build-constraints-file=*)
-      build_constraints_file="${1#*=}"
-      shift
-      ;;
-    --build-constraints-file)
-      build_constraints_file="${2}"
-      shift 2
+    --verify)
+      verify=1
+      shift 1
       ;;
     --docker-image-name=*)
       docker_image_name="${1#*=}"
@@ -198,10 +186,17 @@ if [[ ! -v docker_image_name ]]; then
 else
   echo "Using '$docker_image_name' for the name of the Docker Image generated to build."
 fi
-if [[ -z "$build_constraints_file" ]]; then
-    build_constraints_file=$DEFAULT_BUILD_CONSTRAINTS
-else
-  echo "Using '$build_constraints_file' for constraints file."
-fi
 check_args
-generate_wheel "$PLATFORM" "$docker_image_name" "$build_constraints_file" "${python_versions[@]}"
+mkdir -p build
+temp_dir="$(mktemp -d build/pymediaconch_wheels_XXXXXX)"
+trap 'rm -rf $temp_dir' EXIT
+
+generate_wheel "$PLATFORM" "$docker_image_name" "$temp_dir" "${python_versions[@]}"
+
+if (( verify )); then
+  test_wheels "${temp_dir}/output.tsv" "$temp_dir" "$PROJECT_ROOT"
+fi
+
+mkdir -p "$OUTPUT_PATH"
+mv "${temp_dir}"/*.whl "${OUTPUT_PATH}/"
+echo "Built wheel can be found in '$OUTPUT_PATH'"

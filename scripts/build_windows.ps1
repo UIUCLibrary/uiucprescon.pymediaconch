@@ -76,7 +76,7 @@ function Build-Wheel {
         "-e UV_TOOL_DIR=${UV_TOOL_DIR}",
         '--entrypoint', 'powershell',
         $DockerImageName
-        "Build-Wheel ${containerSourcePath} ${containerDistPath} ${PythonVersion} ${containerSourcePath}\requirements-dev.txt"
+        "Build-Wheel ${containerSourcePath} ${containerDistPath} ${PythonVersion}"
     )
 
     $local:dockerBuildProcess = Start-Process -FilePath $DockerExec -WorkingDirectory $(Get-Item $PSScriptRoot).Parent.FullName -ArgumentList $dockerArgsList -NoNewWindow -PassThru -Wait

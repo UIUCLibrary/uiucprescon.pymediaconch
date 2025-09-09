@@ -22,10 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install uv
-          uv venv
-          . ./.venv/bin/activate
-          uv pip install -e .
-          uv pip install --constraints=requirements-dev.txt sphinx
+          uv sync --group docs
       - name: Sphinx build
         run: |
           . ./.venv/bin/activate
