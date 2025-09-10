@@ -604,6 +604,16 @@ pipeline {
                                         }
                                     }
                                 }
+                                stage('Audit uv.lock File'){
+                                    steps{
+                                        catchError(
+                                            buildResult: 'UNSTABLE',
+                                            message: 'uv-secure found issues. uv.lock might need to updated'
+                                        ) {
+                                            sh './venv/bin/uvx uv-secure --cache-path=/tmp/cache/uv-secure uv.lock'
+                                        }
+                                    }
+                                }
                                 stage('MyPy Static Analysis') {
                                     environment{
                                         MYPYPATH='build/lib'
