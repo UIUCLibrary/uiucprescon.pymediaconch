@@ -17,6 +17,13 @@ The only prereq is that uv is installed.
     user@DEVMACHINE123 % source .venv/bin/activate
 
 
+Add pre-commit hooks to help verify code quality before changes are commited.
+
+.. code-block:: shell-session
+
+    (venv) user@DEVMACHINE123 % pre-commit install
+
+
 -------------
 Running tests
 -------------
