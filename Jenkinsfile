@@ -465,9 +465,8 @@ pipeline {
                                                                    trap "rm -rf bootstrap_uv" EXIT
                                                                    bootstrap_uv/bin/pip install --disable-pip-version-check uv
                                                                    bootstrap_uv/bin/uv venv  --python-preference=only-system  venv
-                                                                   . ./venv/bin/activate
-                                                                   bootstrap_uv/bin/uv sync --frozen --only-group dev --active
-                                                                   bootstrap_uv/bin/uv pip install uv --python venv
+                                                                   UV_PROJECT_ENVIRONMENT=./venv bootstrap_uv/bin/uv sync --frozen --only-group dev
+                                                                   bootstrap_uv/bin/uv pip install uv --python ./venv/bin/python
                                                                 '''
                                                    )
                                                 } catch(e){
@@ -602,6 +601,16 @@ pipeline {
                                     post{
                                         always {
                                             recordIssues(tools: [sphinxBuild(id: 'doctest', name: 'Doctest', pattern: 'logs/doctest.txt')])
+                                        }
+                                    }
+                                }
+                                stage('Audit uv.lock File'){
+                                    steps{
+                                        catchError(
+                                            buildResult: 'UNSTABLE',
+                                            message: 'uv-secure found issues. uv.lock might need to updated'
+                                        ) {
+                                            sh './venv/bin/uvx uv-secure --cache-path=/tmp/cache/uv-secure uv.lock'
                                         }
                                     }
                                 }
@@ -840,9 +849,6 @@ pipeline {
             when{
                 equals expected: true, actual: params.BUILD_PACKAGES
             }
-//             environment{
-//                 UV_BUILD_CONSTRAINT='requirements-dev.txt'
-//             }
             failFast true
             parallel{
                 stage('Platform Wheels: Linux'){
@@ -1185,9 +1191,10 @@ pipeline {
                                         label: 'Uploading to pypi',
                                         script: '''python3 -m venv venv
                                                    trap "rm -rf venv" EXIT
+                                                   ./venv/bin/pip install --disable-pip-version-check uv
                                                    . ./venv/bin/activate
-                                                   pip install --disable-pip-version-check uv
-                                                   uvx --constraint=requirements-dev.txt twine upload --disable-progress-bar --non-interactive dist/*
+                                                   uv sync --active --frozen --only-group deploy
+                                                   upload --disable-progress-bar --non-interactive dist/*
                                                 '''
                                     )
                             }
