@@ -840,9 +840,6 @@ pipeline {
             when{
                 equals expected: true, actual: params.BUILD_PACKAGES
             }
-//             environment{
-//                 UV_BUILD_CONSTRAINT='requirements-dev.txt'
-//             }
             failFast true
             parallel{
                 stage('Platform Wheels: Linux'){
@@ -1185,9 +1182,10 @@ pipeline {
                                         label: 'Uploading to pypi',
                                         script: '''python3 -m venv venv
                                                    trap "rm -rf venv" EXIT
+                                                   ./venv/bin/pip install --disable-pip-version-check uv
                                                    . ./venv/bin/activate
-                                                   pip install --disable-pip-version-check uv
-                                                   uvx --constraint=requirements-dev.txt twine upload --disable-progress-bar --non-interactive dist/*
+                                                   uv sync --active --frozen --only-group deploy
+                                                   upload --disable-progress-bar --non-interactive dist/*
                                                 '''
                                     )
                             }
