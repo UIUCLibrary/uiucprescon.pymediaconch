@@ -1,0 +1,5 @@
+repos:
+- repo: https://github.com/owenlamont/uv-secure
+  rev: 0.13.0
+  hooks:
+    - id: uv-secure
