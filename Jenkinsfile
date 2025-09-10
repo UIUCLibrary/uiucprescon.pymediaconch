@@ -465,9 +465,8 @@ pipeline {
                                                                    trap "rm -rf bootstrap_uv" EXIT
                                                                    bootstrap_uv/bin/pip install --disable-pip-version-check uv
                                                                    bootstrap_uv/bin/uv venv  --python-preference=only-system  venv
-                                                                   . ./venv/bin/activate
-                                                                   bootstrap_uv/bin/uv sync --frozen --only-group dev --active
-                                                                   bootstrap_uv/bin/uv pip install uv --python venv
+                                                                   UV_PROJECT_ENVIRONMENT=./venv bootstrap_uv/bin/uv sync --frozen --only-group dev
+                                                                   bootstrap_uv/bin/uv pip install uv --python ./venv/bin/python
                                                                 '''
                                                    )
                                                 } catch(e){
