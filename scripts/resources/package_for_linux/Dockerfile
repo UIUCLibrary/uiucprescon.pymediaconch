@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/path/to/pipx/cache \
 FROM base AS conan_builder
 
 RUN --mount=type=cache,target=/var/cache/yum \
-    yum install -y perl-IPC-Cmd perl-Digest-SHA && \
+    yum install -y perl-IPC-Cmd perl-Digest-SHA perl-Time-Piece && \
     case $(uname -m) in \
       x86_64)  yum install -y jq ;; \
       aarch64) yum install -y wget gawk; \

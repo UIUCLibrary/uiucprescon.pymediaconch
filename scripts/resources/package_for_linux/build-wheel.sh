@@ -12,6 +12,7 @@ SKIP_DIRS_NAMED=(\
     '.ruff_cache' \
     '.tox' \
     'venv' \
+    '.venv' \
     'reports' \
     '__pycache__' \
     'wheelhouse' \
