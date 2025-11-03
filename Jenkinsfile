@@ -628,12 +628,15 @@ pipeline {
                                     }
                                 }
                                 stage('Audit uv.lock File'){
+                                    options{
+                                        timeout(5)
+                                    }
                                     steps{
                                         catchError(
                                             buildResult: 'UNSTABLE',
                                             message: 'uv-secure found issues. uv.lock might need to updated'
                                         ) {
-                                            sh './venv/bin/uvx uv-secure --cache-path=/tmp/cache/uv-secure uv.lock'
+                                            sh './venv/bin/uvx uv-secure --disable-cache uv.lock'
                                         }
                                     }
                                 }
