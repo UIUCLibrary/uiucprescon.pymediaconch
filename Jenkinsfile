@@ -628,6 +628,9 @@ pipeline {
                                     }
                                 }
                                 stage('Audit uv.lock File'){
+                                    options{
+                                        timeout(5)
+                                    }
                                     steps{
                                         catchError(
                                             buildResult: 'UNSTABLE',
