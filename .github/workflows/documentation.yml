@@ -22,9 +22,21 @@ jobs:
       - name: Install dependencies
         run: |
           pip install uv
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: "/home/runner/.conan2"
+          key: conan-dependencies-${{ hashFiles('**/conanfile.py', 'conan.lock') }}
+
+      - name: Install Conan dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          uv run --only-group=build conan profile detect --exist-ok
+          uv run --only-group=build conan install conanfile.py --build missing -of /tmp/ciwheelbuilder -pr:b=default
+          rm -rf /tmp/ciwheelbuilder
       - name: Sphinx build
         run: |
-          uv run --group docs --no-cache --with-editable . sphinx-build docs/source _build
+          uv run -v --group docs --no-cache --with-editable . sphinx-build docs/source _build
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true'

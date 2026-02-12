@@ -3,7 +3,7 @@
 set -e
 scriptDir=$(dirname "${BASH_SOURCE[0]}")
 PROJECT_ROOT=$(realpath "$scriptDir/..")
-DEFAULT_PYTHON_VERSION="3.13"
+DEFAULT_PYTHON_VERSION="abi3"
 DOCKERFILE=$(realpath "$scriptDir/resources/package_for_linux/Dockerfile")
 DEFAULT_DOCKER_IMAGE_NAME="pymediaconch_builder"
 OUTPUT_PATH="$PROJECT_ROOT/dist"
@@ -42,6 +42,7 @@ generate_wheel(){
     mkdir -p "$output_path"
     docker run --rm \
         --platform="$platform" \
+        --interactive \
         -v "$PROJECT_ROOT":/project:ro \
         --mount type=bind,src="$(realpath "$output_path")",dst=/dist \
         "$docker_image_name_to_use" \
@@ -58,7 +59,7 @@ test_wheels(){
         print "Testing "$1 " with tox"
         wheel_outside = wheel_path "/" $1
         wheel_inside = "/test_env/dist/" $1
-        system("docker run --user $(id -u):$(id -g) --rm -v " source_path "/tox.ini:/test_env/tox.ini -v " source_path "/pyproject.toml:/test_env/pyproject.toml -v " source_path "/tests/:/test_env/tests/ -v " wheel_outside ":" wheel_inside " --workdir /test_env/ --entrypoint=\"/bin/bash\" python -c \"python -m venv /venv && /venv/bin/pip install --disable-pip-version-check uv && /venv/bin/uvx --with tox-uv tox run -e " $2 " --installpkg " wheel_inside " \" ")
+        system("docker run --user $(id -u):$(id -g) --rm -v " source_path "/tox.ini:/test_env/tox.ini -v " source_path "/pyproject.toml:/test_env/pyproject.toml -v " source_path "/tests/:/test_env/tests/ -v " wheel_outside ":" wheel_inside " --workdir /test_env/ --entrypoint=\"/bin/bash\" python -c \"python -m venv /venv && /venv/bin/pip install --disable-pip-version-check uv && /venv/bin/uv run --only-group=tox --with=tox-uv tox run -e " $2 " --installpkg " wheel_inside " \" ")
       }
     }
     ' wheel_path="$(realpath "$wheel_path")" source_path="$(realpath "$source_path")" "$manifest_tsv"

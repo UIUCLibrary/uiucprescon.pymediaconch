@@ -33,29 +33,29 @@ COPY ci/docker/shared/conan/remotes.json  ${CONAN_HOME}/remotes.json
 ARG PIP_INDEX_URL
 ARG CONAN_CENTER_PROXY_V2_URL
 ARG UV_CACHE_DIR
-ENV UV_CONSTRAINT=/tmp/requirements-dev.txt
 ARG PIP_CACHE_DIR
+ENV UV_PROJECT=/tmp/project \
+    UV_FROZEN=1
 ARG CONAN_DOWNLOAD_CACHE=/tmp/conan_download_cache
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=cache,target=${UV_CACHE_DIR} \
     --mount=type=cache,target=${CONAN_DOWNLOAD_CACHE} \
-    --mount=type=bind,source=uv.lock,target=/tmp/project/uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=/tmp/project/pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=${UV_PROJECT}/uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=${UV_PROJECT}/pyproject.toml \
     --mount=type=bind,source=conanfile.py,target=/tmp/conanfile.py \
     --mount=type=bind,source=conan.lock,target=/tmp/conan.lock \
     python3 -m venv venv && \
     ./venv/bin/pip --disable-pip-version-check install uv && \
-    ./venv/bin/uv export --frozen --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
-    ./venv/bin/uvx --with cmake conan profile detect --exist-ok &&  \
+    ./venv/bin/uv run --only-group=build conan profile detect --exist-ok &&  \
     cp ${CONAN_HOME}/global.conf /tmp/global.conf.original && \
     echo "core.sources:download_cache = $CONAN_DOWNLOAD_CACHE" >> ${CONAN_HOME}/global.conf && \
     if [ "$(jq -r '.remotes[0].url' ${CONAN_HOME}/remotes.json )" != "${CONAN_CENTER_PROXY_V2_URL}" ]; then \
         echo "Setting the conan center url for building cache: ${CONAN_CENTER_PROXY_V2_URL}" && \
         cp ${CONAN_HOME}/remotes.json /tmp/remotes.json && \
-        ./venv/bin/uvx --with cmake conan remote update conan-center --url ${CONAN_CENTER_PROXY_V2_URL}; \
+        ./venv/bin/uv run --only-group=build conan remote update conan-center --url ${CONAN_CENTER_PROXY_V2_URL}; \
     fi && \
-    ./venv/bin/uvx --with cmake conan install /tmp -pr:b=default --build missing -pr:b=default && \
-    ./venv/bin/uvx --with cmake conan cache clean "*" -b --source --build --temp && \
+    ./venv/bin/uv run --only-group=build conan install /tmp -pr:b=default --build missing -pr:b=default && \
+    ./venv/bin/uv run --only-group=build conan cache clean "*" -b --source --build --temp && \
     rm -rf venv && \
     if [ "$(jq -r '.remotes[0].url' ${CONAN_HOME}/remotes.json )" != "${CONAN_CENTER_PROXY_V2_URL}" ]; then \
       mv -f /tmp/remotes.json ${CONAN_HOME}/remotes.json; \

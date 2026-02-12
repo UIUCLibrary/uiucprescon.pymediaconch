@@ -79,19 +79,19 @@ COPY scripts/resources/windows/conan/profile.ini ${CONAN_HOME}/profiles/default
 COPY uv.lock pyproject.toml c:/temp/project/
 COPY conanfile.py c:/temp/conanfile.py
 COPY conan.lock c:/temp/conan.lock
-ENV UV_CONSTRAINT=c:/temp/requirements-dev.txt
+ENV UV_FROZEN=1 `
+    UV_PROJECT=c:/temp/project
 ARG CONAN_CENTER_PROXY_V2_URL
-RUN uv export --frozen --only-dev --no-hashes --directory c:/temp/project/ > ${Env:UV_CONSTRAINT} ; `
-    uvx --with cmake conan profile detect --exist-ok ; `
+RUN uv run --only-group=build conan profile detect --exist-ok ; `
     if (${env:CONAN_CENTER_PROXY_V2_URL} -ne $(Get-Content -Raw -Path ${Env:CONAN_HOME}\remotes.json)) { `
           Copy-Item -Path "${Env:CONAN_HOME}\remotes.json" -Destination "c:\remotes.json" ; `
-          uvx --with cmake conan remote update conan-center --url ${env:CONAN_CENTER_PROXY_V2_URL}; `
+          uv run --only-group=build conan remote update conan-center --url ${env:CONAN_CENTER_PROXY_V2_URL}; `
     }; `
-    uvx --with cmake conan install c:/temp/ --build missing -pr:b=default ; `
+    uv run --only-group=build conan install c:/temp/ --build missing -pr:b=default ; `
     if ($LASTEXITCODE -ne 0) { `
       throw \"Command 'conan install' failed with exit code: $LASTEXITCODE\"`
     } ;`
-    uvx --with cmake conan cache clean "*" -b --source --build --temp ; `
+    uv run --only-group=build conan cache clean "*" -b --source --build --temp ; `
     uv cache clean --no-progress ; `
     if (${env:CONAN_CENTER_PROXY_V2_URL} -ne $(Get-Content -Raw -Path ${Env:CONAN_HOME}\remotes.json)) { `
       Move-Item -Path "c:\remotes.json" -Destination "${Env:CONAN_HOME}\remotes.json" -Force ;`

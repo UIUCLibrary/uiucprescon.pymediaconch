@@ -1,11 +1,7 @@
 [build-system]
-requires = [
-    "cmake",
-    'pybind11>2.13.0',
-    "pybind11_stubgen",
-    'uiucprescon.build @ https://github.com/UIUCLibrary/uiucprescon_build/releases/download/v0.3.0/uiucprescon_build-0.3.0-py3-none-any.whl',
-]
-build-backend = "uiucprescon.build"
+requires = ["setuptools"]
+build-backend = "local_backend"
+backend-path = ["build_backend"]
 
 [project]
 name = "uiucprescon.pymediaconch"
@@ -23,20 +19,22 @@ authors = [
 readme = {file = "README.md", content-type = "text/markdown"}
 
 [dependency-groups]
-test = ["coverage", "pytest",]
-docs = ["sphinx", 'tomli;python_version<"3.11"']
+test = ["coverage", "pytest"]
+tox = ["tox"]
+build = ["nanobind", "cmake<4.0", "conan>2.0", "setuptools", "delvewheel;os_name == 'nt'"]
+docs = [
+    {include-group = "build"},
+    "sphinx",
+    'tomli;python_version<"3.11"',
+]
 dev = [
     {include-group = "docs"},
     {include-group = "test"},
-    "cmake<4.0",
+    {include-group = "tox"},
+    {include-group = "build"},
     "lxml",
     "mypy",
     "pre-commit>=4.3.0",
-    "pybind11>=2.13.0",
-    "pybind11_stubgen",
-    "setuptools",
-    "tox",
-    "uiucprescon.build @ https://github.com/UIUCLibrary/uiucprescon_build/releases/download/v0.3.0/uiucprescon_build-0.3.0-py3-none-any.whl",
 ]
 
 deploy = ["twine"]
@@ -44,12 +42,13 @@ deploy = ["twine"]
 ci = [
     {include-group = "dev"},
     {include-group = "deploy"},
+    "gcovr;sys_platform == 'linux'",
 ]
 
 
 [tool.setuptools]
 packages = ["uiucprescon.pymediaconch"]
-package-dir = {"" = "src"}
+package-dir = {"uiucprescon.pymediaconch" = "src/uiucprescon/pymediaconch"}
 
 [tool.commitizen]
 name = "cz_conventional_commits"
@@ -58,3 +57,6 @@ version_scheme = "pep440"
 version_provider = "pep621"
 update_changelog_on_bump = true
 major_version_zero = true
+
+[tool.uv.extra-build-dependencies]
+uiucprescon-pymediaconch = ["nanobind", "cmake", "conan>2.0"]

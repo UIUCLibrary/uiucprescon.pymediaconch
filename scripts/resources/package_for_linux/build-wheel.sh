@@ -3,7 +3,7 @@
 set -e
 
 WORKSPACE="/workspace"
-
+MINIMUM_FOR_ABI3="3.12"
 SKIP_DIRS_NAMED=(\
     '.git' \
     '.idea' \
@@ -23,7 +23,6 @@ SKIP_DIRS_NAMED=(\
 )
 REMOVE_FILES_FIRST=(\
   'CMakeUserPresets.json'
-  'conan.lock'
   )
 
 make_shadow_copy() {
@@ -83,6 +82,9 @@ make_wheels() {
   touch output_manifest
   mkdir -p "$dist_directory"
   for python_version in "${python_versions[@]}"; do
+      if [[ "$python_version" == 'abi3' ]]; then
+          python_version="$MINIMUM_FOR_ABI3"
+      fi
       echo "Creating wheel for Python version: $python_version"
       local temp_dir
       temp_dir="$(mktemp -d -t pymediaconch_wheel_XXXXXX)"
@@ -104,10 +106,10 @@ make_wheels() {
 
 verify_package_with_twine() {
   local dist_directory=$1
-  local build_constraints=$2
+  local path=$2
   echo 'Verifying package with twine'
 
-  if ! uvx --build-constraints "${build_constraints}" twine check --strict "${dist_directory}"/*.whl
+  if ! uv run --frozen --isolated --project="${path}" --only-group=deploy twine check --strict "${dist_directory}"/*.whl
   then
     echo "Twine check failed. Please fix the issues and try again."
     exit 1
@@ -154,7 +156,7 @@ echo "Building wheels for Python versions: ${python_versions_to_use[*]}"
 make_shadow_copy "$source_directory" "$WORKSPACE"
 uv export --frozen --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "${WORKSPACE}" > $build_constraints
 make_wheels "$WORKSPACE" "/tmp/dist" "${build_constraints}" "${python_versions_to_use[@]}"
-verify_package_with_twine "/tmp/dist" "${build_constraints}"
+verify_package_with_twine "/tmp/dist" "${source_directory}"
 fix_up_wheels "/tmp/dist" "${output_directory}"
 #cp "/tmp/dist/output.tsv" "${output_directory}/output.tsv"
 echo 'Done'
