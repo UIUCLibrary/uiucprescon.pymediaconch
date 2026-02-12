@@ -65,6 +65,7 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=bind,source=uv.lock,target=/tmp/project/uv.lock \
     --mount=type=bind,source=pyproject.toml,target=/tmp/project/pyproject.toml \
     --mount=type=bind,source=conanfile.py,target=/tmp/conanfile.py \
+    --mount=type=bind,source=conan.lock,target=/tmp/conan.lock \
     uv export --frozen --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
     uvx --with cmake conan profile detect --exist-ok &&  \
     cp ${CONAN_HOME}/global.conf /tmp/global.conf.original && \

@@ -78,6 +78,7 @@ COPY ci/docker/shared/conan/remotes.json ${CONAN_HOME}/remotes.json
 COPY scripts/resources/windows/conan/profile.ini ${CONAN_HOME}/profiles/default
 COPY uv.lock pyproject.toml c:/temp/project/
 COPY conanfile.py c:/temp/conanfile.py
+COPY conan.lock c:/temp/conan.lock
 ENV UV_CONSTRAINT=c:/temp/requirements-dev.txt
 ARG CONAN_CENTER_PROXY_V2_URL
 RUN uv export --frozen --only-dev --no-hashes --directory c:/temp/project/ > ${Env:UV_CONSTRAINT} ; `

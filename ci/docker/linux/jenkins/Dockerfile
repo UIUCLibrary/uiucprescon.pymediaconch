@@ -42,6 +42,7 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=bind,source=uv.lock,target=/tmp/project/uv.lock \
     --mount=type=bind,source=pyproject.toml,target=/tmp/project/pyproject.toml \
     --mount=type=bind,source=conanfile.py,target=/tmp/conanfile.py \
+    --mount=type=bind,source=conan.lock,target=/tmp/conan.lock \
     python3 -m venv venv && \
     ./venv/bin/pip --disable-pip-version-check install uv && \
     ./venv/bin/uv export --frozen --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
