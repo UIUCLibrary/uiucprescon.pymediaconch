@@ -38,17 +38,17 @@ function Build-Wheel {
         param (
             [string]$WheelFile,
             [string]$OutputDirectory,
-            [string]$ConstraintsFile
+            [string]$SourceDirectory
         )
-        uvx --constraints $ConstraintsFile delvewheel repair $WheelFile --namespace-pkg uiucprescon.pymediaconch --no-mangle-all --wheel-dir $OutputDirectory
+        uv run --frozen --only-group=build --project=$SourceDirectory --isolated delvewheel repair $WheelFile --namespace-pkg uiucprescon.pymediaconch --no-mangle-all --wheel-dir $OutputDirectory
     }
 
     function Verify-PackageWithTwine{
         param (
             [string]$PackagePath,
-            [string]$ConstraintsFile
+            [string]$SourceDirectory
         )
-        uvx --constraints $ConstraintsFile twine check --strict $PackagePath
+        uv run --frozen --only-group=deploy --project=$SourceDirectory --isolated twine check --strict $PackagePath
         if ($LASTEXITCODE -ne 0)
         {
             throw "Twine check failed for package: $PackagePath"
@@ -67,9 +67,9 @@ function Build-Wheel {
 
 
     foreach ($item in $(Get-ChildItem -Path "$env:TEMP\wheel_tmp" -Filter "*.whl")){
-        Verify-PackageWithTwine -PackagePath $item.FullName -ConstraintsFile $ConstrainstsFile
+        Verify-PackageWithTwine -PackagePath $item.FullName -SourceDirectory $SourceDirectory
         Write-Host "Fixing up $item"
-        FixupPythonWheel -ConstraintsFile $ConstrainstsFile -WheelFile $item.FullName -OutputDirectory $OutputDirectory
+        FixupPythonWheel -SourceDirectory $SourceDirectory -WheelFile $item.FullName -OutputDirectory $OutputDirectory
     }
     Write-Host "Wheel built successfully and saved to $OutputDirectory"
 }

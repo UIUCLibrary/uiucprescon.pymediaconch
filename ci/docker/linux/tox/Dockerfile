@@ -48,7 +48,8 @@ ARG CONAN_DOWNLOAD_CACHE=/tmp/conan_download_cache
 COPY ci/docker/shared/conan/remotes.json  ${CONAN_HOME}/remotes.json
 COPY ci/docker/linux/tox/conan/profile.ini ${CONAN_HOME}/profiles/default
 COPY conanfile.py /tmp/conanfile.py
-ENV UV_CONSTRAINT=/tmp/constrainsts.txt
+ENV UV_PROJECT=/tmp/project \
+    UV_FROZEN=1
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=cache,target=${UV_CACHE_DIR} \
     --mount=type=cache,target=${CONAN_DOWNLOAD_CACHE} \
@@ -56,17 +57,16 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=bind,source=pyproject.toml,target=/tmp/project/pyproject.toml \
     python3 -m venv venv --upgrade-deps && \
     ./venv/bin/pip install --disable-pip-version-check uv && \
-    ./venv/bin/uv export --frozen --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
-    ./venv/bin/uvx --with cmake conan profile detect --exist-ok &&  \
+    ./venv/bin/uv run --only-group=build conan profile detect --exist-ok &&  \
     cp ${CONAN_HOME}/global.conf /tmp/global.conf.original && \
     echo "core.sources:download_cache = $CONAN_DOWNLOAD_CACHE" >> ${CONAN_HOME}/global.conf && \
     if [ "$(jq -r '.remotes[0].url' ${CONAN_HOME}/remotes.json )" != "${CONAN_CENTER_PROXY_V2_URL}" ]; then \
         echo "Setting the conan center url for building cache: ${CONAN_CENTER_PROXY_V2_URL}" && \
         cp ${CONAN_HOME}/remotes.json /tmp/remotes.json && \
-        ./venv/bin/uvx --with cmake conan remote update conan-center --url ${CONAN_CENTER_PROXY_V2_URL}; \
+        ./venv/bin/uv run --only-group=build conan remote update conan-center --url ${CONAN_CENTER_PROXY_V2_URL}; \
     fi && \
-    ./venv/bin/uvx --with cmake --with ninja conan install /tmp/conanfile.py -pr:b=default --build missing -c tools.cmake.cmaketoolchain:generator=Ninja && \
-    ./venv/bin/uvx --with cmake conan cache clean "*" -b --source --build --temp && \
+    ./venv/bin/uv run --only-group=build --with=ninja conan install /tmp/conanfile.py -pr:b=default --build missing -c tools.cmake.cmaketoolchain:generator=Ninja && \
+    ./venv/bin/uv run --only-group=build conan cache clean "*" -b --source --build --temp && \
     rm -rf venv && \
     mv -f /tmp/global.conf.original ${CONAN_HOME}/global.conf && \
     if [ "$(jq -r '.remotes[0].url' ${CONAN_HOME}/remotes.json )" != "${CONAN_CENTER_PROXY_V2_URL}" ]; then \

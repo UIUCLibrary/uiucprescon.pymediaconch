@@ -19,29 +19,26 @@ find_package(Libevent QUIET)
 FetchContent_Declare(
     MediaConchSource
         GIT_REPOSITORY https://github.com/MediaArea/MediaConch_SourceCode.git
-        GIT_TAG        61d878d177d8a19cf99c523d5019a7197c905040
-#    URL https://github.com/MediaArea/MediaConch_SourceCode/archive/refs/tags/v25.04.tar.gz
-#    URL_HASH SHA256=08cdc983e252292497808de75797fcea997cf9e2ecc2fbcfb3ec9b7f4ebfdfbf
-)
-
-FetchContent_Declare(Pybind11
-    URL https://github.com/pybind/pybind11/archive/refs/tags/v2.11.1.tar.gz
-    URL_HASH SHA256=d475978da0cdc2d43b73f30910786759d593a9d8ee05b1b6846d1eb16c6d2e0c
-#todo: set this back to v3.0.0 when uiucprescon.build can use other versions of Pybind11
-#    URL https://github.com/pybind/pybind11/archive/refs/tags/v3.0.0.tar.gz
-#    URL_HASH SHA256=453b1a3e2b266c3ae9da872411cadb6d693ac18063bd73226d96cfb7015a200c
+        GIT_TAG        5823658764db3dc7f5d7b82b8f8909cfad43f7d8
+        EXCLUDE_FROM_ALL
 )
 
 
 FetchContent_MakeAvailable(MediaConchSource)
 
 if(${PROJECT_NAME}_build_python_extension)
-
-    FetchContent_MakeAvailable(Pybind11)
-    add_subdirectory(${pybind11_SOURCE_DIR})
-    find_package(Python COMPONENTS Interpreter Development REQUIRED)
-    pybind11_add_module(pymediametadata src/uiucprescon/pymediaconch/pymediaconch.cpp)
-    target_link_libraries(pymediametadata PRIVATE MediaConchLib)
-
+    find_package(Python COMPONENTS Interpreter Development.Module Development.SABIModule REQUIRED)
+    # Detect the installed nanobind package and import it into CMake
+    if(NOT nanobind_DIR)
+        execute_process(
+            COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+            OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE nanobind_DIR
+        )
+    endif()
+    find_package(nanobind CONFIG REQUIRED)
+    nanobind_add_module(mediaconch STABLE_ABI FREE_THREADED src/uiucprescon/pymediaconch/pymediaconch.cpp)
+    target_link_libraries(mediaconch PRIVATE MediaConchLib)
+    target_include_directories(mediaconch PRIVATE ${mediaconchsource_SOURCE_DIR}/Source/Lib)
+    install(TARGETS mediaconch LIBRARY DESTINATION "uiucprescon/pymediaconch")
 endif ()
 

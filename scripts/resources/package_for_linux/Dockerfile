@@ -23,10 +23,6 @@ FROM quay.io/pypa/manylinux_2_28 AS base
 RUN --mount=type=cache,target=/var/cache/yum \
     yum install -y lndir
 
-# This needed to use uvx with --constraint option
-RUN --mount=type=cache,target=/path/to/pipx/cache \
-    pipx install "uv>=0.6.5" --force
-
 # ==============================================================================
 FROM base AS conan_builder
 
@@ -58,24 +54,25 @@ ARG UV_CACHE_DIR
 ARG PIP_CACHE_DIR
 ARG CONAN_CENTER_PROXY_V2_URL
 ARG CONAN_DOWNLOAD_CACHE=/tmp/conan_download_cache
-ENV UV_CONSTRAINT=/tmp/constraint.txt
+ENV UV_PROJECT=/tmp/project \
+    UV_FROZEN=1
 RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
     --mount=type=cache,target=${UV_CACHE_DIR} \
     --mount=type=cache,target=${CONAN_DOWNLOAD_CACHE} \
-    --mount=type=bind,source=uv.lock,target=/tmp/project/uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=/tmp/project/pyproject.toml \
+    --mount=type=bind,source=uv.lock,target=${UV_PROJECT}/uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=${UV_PROJECT}/pyproject.toml \
     --mount=type=bind,source=conanfile.py,target=/tmp/conanfile.py \
-    uv export --frozen --only-dev --no-hashes --directory /tmp/project/ > ${UV_CONSTRAINT} && \
-    uvx --with cmake conan profile detect --exist-ok &&  \
+    --mount=type=bind,source=conan.lock,target=/tmp/conan.lock \
+    uv run --only-group=build conan profile detect --exist-ok &&  \
     cp ${CONAN_HOME}/global.conf /tmp/global.conf.original && \
     echo "core.sources:download_cache = $CONAN_DOWNLOAD_CACHE" >> ${CONAN_HOME}/global.conf && \
     if [ "$(jq -r '.remotes[0].url' ${CONAN_HOME}/remotes.json )" != "${CONAN_CENTER_PROXY_V2_URL}" ]; then \
           echo "Setting the conan center url for building cache: ${CONAN_CENTER_PROXY_V2_URL}" && \
           cp ${CONAN_HOME}/remotes.json /tmp/remotes.json && \
-          uvx --with cmake conan remote update conan-center --url ${CONAN_CENTER_PROXY_V2_URL}; \
+          uv run --only-group=build conan remote update conan-center --url ${CONAN_CENTER_PROXY_V2_URL}; \
         fi && \
-    uvx --with cmake conan install /tmp --build missing && \
-    uvx --with cmake conan cache clean "*" -b --source --build --temp && \
+    uv run --only-group=build conan install /tmp --build missing && \
+    uv run --only-group=build conan cache clean "*" -b --source --build --temp && \
     if [ "$(jq -r '.remotes[0].url' ${CONAN_HOME}/remotes.json )" != "${CONAN_CENTER_PROXY_V2_URL}" ]; then \
         mv -f /tmp/remotes.json ${CONAN_HOME}/remotes.json; \
     fi && \

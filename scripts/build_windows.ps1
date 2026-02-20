@@ -87,7 +87,9 @@ function Build-Wheel {
 }
 
 
-
+if ($PythonVersion -eq "abi3") {
+    $PythonVersion = "3.12"
+}
 Build-DockerImage -ImageName $DockerImageName
 
 Build-Wheel -PythonVersion $PythonVersion -DockerImageName $DockerImageName

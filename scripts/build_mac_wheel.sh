@@ -2,14 +2,14 @@
 INSTALLED_UV=$(command -v uv)
 DEFAULT_BASE_PYTHON="python3"
 REQUIREMENTS_FILE="$(mktemp -d)/constraints.txt"
+MINIMUM_FOR_ABI3="3.12"
 set -e
 
 verify_package_with_twine() {
   local dist_directory=$1
-  local build_constraints=$2
   echo 'Verifying package with twine'
 
-  if ! uvx --build-constraints "${build_constraints}" twine check --strict "${dist_directory}"/*.whl
+  if ! uv run --only-group=deploy twine check --strict "${dist_directory}"/*.whl
   then
     echo "Twine check failed. Please fix the issues and try again."
     exit 1
@@ -24,34 +24,13 @@ generate_wheel_with_uv(){
 
     # Get the processor type
     processor_type=$(uname -m)
-
-    # Set the compiling variables based on the processor results
-    #
-    # The values are taken from cibuildwheel source code
-    # https://github.com/pypa/cibuildwheel/blob/main/cibuildwheel/macos.py
-    #
-    # macOS 11 is the first OS with arm64 support, so the wheels
-    # have that as a minimum.
-
-    if [ "$processor_type" == "arm64" ]; then
-        _PYTHON_HOST_PLATFORM='macosx-11.0-arm64'
-        MACOSX_DEPLOYMENT_TARGET='11.0'
-        ARCHFLAGS='-arch arm64'
-        REQUIRED_ARCH='arm64'
-    elif [ "$processor_type" == "x86_64" ]; then
-        _PYTHON_HOST_PLATFORM='macosx-10.9-x86_64'
-        MACOSX_DEPLOYMENT_TARGET='10.9'
-        ARCHFLAGS='-arch x86_64'
-        REQUIRED_ARCH='x86_64'
-    else
-      echo "Unknown processor type: $processor_type"
-    fi
+    MACOSX_DEPLOYMENT_TARGET='10.13'
 
     out_temp_wheels_dir=$(mktemp -d /tmp/python_wheels.XXXXXX)
     output_path="./dist"
     trap 'rm -rf $out_temp_wheels_dir' ERR SIGINT SIGTERM RETURN
-    UV_INDEX_STRATEGY=unsafe-best-match _PYTHON_HOST_PLATFORM=$_PYTHON_HOST_PLATFORM MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET ARCHFLAGS=$ARCHFLAGS $uv build --python="$pythonVersion" --build-constraints "$constraints" --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
-    verify_package_with_twine "$out_temp_wheels_dir" "${constraints}"
+    MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET $uv build --python="$pythonVersion" --build-constraints "$constraints" --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
+    verify_package_with_twine "$out_temp_wheels_dir"
     search_pattern="$out_temp_wheels_dir/*.whl"
     echo 'Fixing up wheel'
     for file in $search_pattern; do
@@ -68,20 +47,7 @@ generate_wheel_with_uv(){
             echo "$file_name is not linked to anything"
           fi
           $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$constraints" --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "${file}"
-
     done
-#    pattern="$out_temp_wheels_dir/*.whl"
-#    files=( "$pattern" )
-#    echo "Wheels ${files[*]}"
-#    undelocate_wheel="${files[0]}"
-#
-#    echo ""
-#    echo "================================================================================"
-#    echo "${undelocate_wheel} is linked to the following:"
-#    $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-listdeps --depending "${undelocate_wheel}"
-#    echo ""
-#    echo "================================================================================"
-#    $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint $REQUIREMENTS_FILE --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "$undelocate_wheel"
 }
 
 print_usage(){
@@ -129,6 +95,9 @@ scriptDir=$(dirname "${BASH_SOURCE[0]}")
 # Assign the project_root argument to a variable
 project_root=$(realpath "$scriptDir/..")
 python_version=$1
+if [[ "$python_version" == 'abi3' ]]; then
+    python_version="$MINIMUM_FOR_ABI3"
+fi
 
 # validate arguments
 check_args
@@ -140,6 +109,6 @@ if [[ ! -f "$INSTALLED_UV" ]]; then
 else
     uv=$INSTALLED_UV
 fi
-"$uv" export --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "${project_root}" > "$REQUIREMENTS_FILE"
+"$uv" export --only-group=build --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "${project_root}" > "$REQUIREMENTS_FILE"
 cat "$REQUIREMENTS_FILE"
 generate_wheel_with_uv "$uv" "$project_root" "$python_version" "$REQUIREMENTS_FILE"
