@@ -9,16 +9,13 @@ def PYPI_CONFIG_ID = 'pypi_config'
 def SHARED_PIP_CACHE_VOLUME_NAME = 'pipcache'
 
 def SUPPORTED_WINDOWS_VERSIONS_NONABI3 = ['3.11',]
-def SUPPORTED_WINDOWS_VERSIONS_ABI3 = [
-    '3.12',
-    '3.13'
-]
+def SUPPORTED_WINDOWS_VERSIONS_ABI3 = ['3.12', '3.13', '3.14']
 
 def SUPPORTED_MAC_VERSIONS_NONABI3 = ['3.11']
-def SUPPORTED_MAC_VERSIONS_ABI3 = ['3.12', '3.13']
+def SUPPORTED_MAC_VERSIONS_ABI3 = ['3.12', '3.13', '3.14']
 
 def SUPPORTED_LINUX_VERSIONS_NONABI3 = ['3.11']
-def SUPPORTED_LINUX_VERSIONS_ABI3 = ['3.12', '3.13']
+def SUPPORTED_LINUX_VERSIONS_ABI3 = ['3.12', '3.13', '3.14']
 
 def retryTimes = 1
 
@@ -57,7 +54,9 @@ def createUnixUvConfig(){
     }
     return sh(label: 'Setting up uv.toml config file', script: "sh ${scriptFile} " + '$UV_INDEX_URL $UV_EXTRA_INDEX_URL', returnStdout: true).trim()
 }
-
+def getUnixLogicalProcessor(){
+    return sh(label: 'Getting the total number of logical cores', script: 'grep -c ^processor /proc/cpuinfo', returnStdout: true).trim()
+}
 def linux_wheels(nonabi3PythonVersions, abi3PythonVersions, testPackages, params, wheelStashes, retryTimes){
     def selectedArches = []
     def allValidArches = [
@@ -196,13 +195,13 @@ def linux_wheels(nonabi3PythonVersions, abi3PythonVersions, testPackages, params
                                                             try{
                                                                 docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp')
                                                                 {
-                                                                    withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                                                    withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}", "TOX_UV_PATH=${WORKSPACE}/venv/bin/uv"]){
                                                                         sh(
                                                                             label: 'Testing with tox',
                                                                             script: """python3 -m venv venv
                                                                                        ./venv/bin/pip install --disable-pip-version-check uv
                                                                                        trap "rm -rf venv" EXIT
-                                                                                       ./venv/bin/uv run --only-group=tox --with "tox-uv==1.29.0" tox -e py${pythonVersion.replace('.', '')} --installpkg ${findFiles(glob:'dist/*.whl')[0].path} -vv
+                                                                                       ./venv/bin/uv run --only-group=tox tox -e py${pythonVersion.replace('.', '')} --installpkg ${findFiles(glob:'dist/*.whl')[0].path} -vv
                                                                                     """
                                                                         )
                                                                     }
@@ -350,7 +349,7 @@ def mac_wheels(pythonVersionsNonAbi3, pythonVersionsTotestAbi3Wheels, testPackag
                                                                                 sh(label: 'Running Tox',
                                                                                    script: """python${pythonVersion} -m venv venv
                                                                                    ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                                   ./venv/bin/uv run --only-group=tox --with "tox-uv==1.29.0" tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                                   ./venv/bin/uv run --only-group=tox tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
                                                                                 )
                                                                             }
                                                                         }
@@ -449,7 +448,7 @@ def windows_wheels(pythonVersionsNonAbi3, pythonVersionsAbi3, testPackages, para
                                                                     unstash 'python abi3 windows wheel'
                                                                     findFiles(glob: 'dist/*.whl').each{
                                                                         bat """python -m pip install --disable-pip-version-check uv
-                                                                               uv run --only-group tox --with "tox-uv==1.29.0" tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
+                                                                               uv run --python ${pythonVersion}+gil --only-group=tox tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
                                                                             """
                                                                     }
                                                                 }
@@ -547,7 +546,7 @@ def windows_wheels(pythonVersionsNonAbi3, pythonVersionsAbi3, testPackages, para
                                                                 unstash "python${pythonVersion} windows wheel"
                                                                 findFiles(glob: 'dist/*.whl').each{
                                                                     bat """python -m pip install --disable-pip-version-check uv
-                                                                           uv run --only-group tox -p ${pythonVersion} --with "tox-uv==1.29.0" tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
+                                                                           uv run --only-group=tox -p ${pythonVersion} tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
                                                                         """
                                                                 }
                                                             }
@@ -849,7 +848,7 @@ pipeline {
                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
                                                     envs = sh(
                                                         label: 'Get tox environments',
-                                                        script: 'uv run --quiet --only-group=tox --with=tox-uv tox list -d --no-desc',
+                                                        script: 'uv run --quiet --only-group=tox tox list -d --no-desc',
                                                         returnStdout: true,
                                                     ).trim().split('\n')
                                                 }
@@ -874,12 +873,17 @@ pipeline {
                                                         }
                                                         try{
                                                             try{
-                                                                image.inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /cache:exec -e TOX_WORK_DIR=/cache/tox -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment') {
-                                                                    withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                                                image.inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share/uv/credentials --tmpfs /cache:exec -e TOX_WORK_DIR=/cache/tox -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment') {
+                                                                    withEnv([
+                                                                        "UV_CONFIG_FILE=${createUnixUvConfig()}",
+                                                                        "UV_CONCURRENT_BUILDS=${getUnixLogicalProcessor()}",
+                                                                        "UV_CONCURRENT_INSTALLS=${getUnixLogicalProcessor()}",
+                                                                        "UV_LOCK_TIMEOUT=600"
+                                                                        ]){
                                                                         retry(retryTimes){
                                                                             try{
                                                                                 sh( label: 'Running Tox',
-                                                                                    script: "uv run --only-group tox --with 'tox-uv==1.29.0'  --python-preference system tox run -e ${toxEnv} -vv"
+                                                                                    script: "uv run --only-group=tox --python-preference system tox run -e ${toxEnv} -vv"
                                                                                     )
                                                                             } catch(e){
                                                                                 cleanWs(
@@ -931,11 +935,11 @@ pipeline {
                                                         "--mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} " +
                                                         "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                 ){
-                                                 withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
+                                                 withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}"]){
                                                      bat(script: 'python -m venv venv && venv\\Scripts\\pip install --disable-pip-version-check uv')
                                                      envs = bat(
                                                          label: 'Get tox environments',
-                                                         script: '@.\\venv\\Scripts\\uv run --quiet --only-group tox --with tox-uv tox list -d --no-desc',
+                                                         script: '@.\\venv\\Scripts\\uv run --quiet --only-group=tox tox list -d --no-desc --runner=virtualenv',
                                                          returnStdout: true,
                                                      ).trim().split('\r\n')
                                                  }
@@ -973,7 +977,7 @@ pipeline {
                                                                             ]){
                                                                                 bat(label: 'Running Tox',
                                                                                     script: """uv python install cpython-${version}
-                                                                                               uv run --only-group tox --with "tox-uv==1.29.0" tox run -e ${toxEnv} -vv
+                                                                                               uv run --only-group=tox tox run -e ${toxEnv} -vv
                                                                                             """
                                                                                 )
                                                                             }
@@ -1013,7 +1017,7 @@ pipeline {
             when{
                 equals expected: true, actual: params.BUILD_PACKAGES
             }
-            failFast false
+            failFast true
             parallel{
                 stage('Platform Wheels: Linux'){
                     when {
@@ -1118,7 +1122,7 @@ pipeline {
                                                                             sh(label: 'Running Tox',
                                                                                script: """python${pythonVersion} -m venv venv
                                                                                           venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                                          venv/bin/uv run --only-group=tox --with "tox-uv==1.29.0" tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
+                                                                                          venv/bin/uv run --only-group=tox tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
                                                                                           rm -rf ./.tox
                                                                                           rm -rf ./venv
                                                                                        """
@@ -1160,22 +1164,23 @@ pipeline {
                                                                                 dockerImage = docker.build(dockerImageName, '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
                                                                             }
                                                                             withEnv([
-                                                                                'UV_PYTHON_INSTALL_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
+                                                                                'UV_PYTHON_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
                                                                                 'PIP_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\cache\\pipcache',
                                                                                 'UV_CACHE_DIR=C:\\cache\\uvcache',
                                                                                 'SETUPTOOLS_BUILD_TEMP_DIR=c:\\temp\\build',
                                                                                 "UV_CONFIG_FILE=${createWindowUVConfig()}"
                                                                             ]){
                                                                                 dockerImage.inside(
-                                                                                    '--mount type=volume,source=uv_python_install_dir,target=$UV_PYTHON_INSTALL_DIR ' +
+                                                                                    '--mount type=volume,source=uv_python_cache_dir,target=$UV_PYTHON_CACHE_DIR ' +
                                                                                     '--mount type=volume,source=pipcache,target=$PIP_CACHE_DIR ' +
                                                                                     '--mount type=volume,source=uv_cache_dir,target=$UV_CACHE_DIR'
                                                                                 ){
                                                                                     unstash 'python sdist'
+                                                                                    bat "uv python install cpython-${pythonVersion}"
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
                                                                                         powershell(
                                                                                             label: 'Running Tox',
-                                                                                            script: "uv run --only-group tox --with \"tox-uv==1.29.0\" tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
+                                                                                            script: "uv run --python ${pythonVersion}+gil --only-group=tox tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
                                                                                         )
                                                                                     }
                                                                                 }
@@ -1243,7 +1248,7 @@ pipeline {
                                                                                                        trap "rm -rf venv" EXIT
                                                                                                        venv/bin/pip install --disable-pip-version-check uv
                                                                                                        trap "rm -rf venv && rm -rf .tox" EXIT
-                                                                                                       venv/bin/uv run --python-preference system --only-group=tox --with "tox-uv==1.29.0"  tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                                                       venv/bin/uv run --python-preference system --only-group=tox tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')} -vv"""
                                                                                             )
                                                                                     }
                                                                                 }
