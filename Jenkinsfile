@@ -628,6 +628,7 @@ pipeline {
                         UV_PYTHON_INSTALL_DIR='/tmp/uvpython'
                         UV_CACHE_DIR='/tmp/uvcache'
                         UV_CONFIG_FILE="${createUnixUvConfig()}"
+                        UV_PROJECT_ENVIRONMENT="${WORKSPACE}/venv"
                     }
                     stages{
                         stage('Setup'){
@@ -643,7 +644,7 @@ pipeline {
                                                                    trap "rm -rf bootstrap_uv" EXIT
                                                                    bootstrap_uv/bin/pip install --disable-pip-version-check uv
                                                                    bootstrap_uv/bin/uv venv  --python-preference=only-system  venv
-                                                                   UV_PROJECT_ENVIRONMENT=./venv bootstrap_uv/bin/uv sync --frozen --only-group dev
+                                                                   bootstrap_uv/bin/uv sync --frozen --only-group dev
                                                                    bootstrap_uv/bin/uv pip install uv --python ./venv/bin/python
                                                                 '''
                                                    )
@@ -681,6 +682,11 @@ pipeline {
                                                        python setup.py build_ext --inplace --build-temp build/temp  --build-lib build/lib --debug
                                                        '''
                                         )
+                                    }
+                                    post{
+                                        failure{
+                                            sh './venv/bin/uv pip list'
+                                        }
                                     }
                                 }
                             }
