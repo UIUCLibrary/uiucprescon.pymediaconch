@@ -11,52 +11,50 @@ ARG UV_CACHE_DIR=/.cache/uv
 ARG CONAN_USER_HOME=/conan
 ARG CONAN_HOME=${CONAN_USER_HOME}/.conan2
 
+FROM ghcr.io/astral-sh/uv:latest AS uv_builder
+
 FROM ubuntu:24.04 AS base
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     --mount=type=bind,source=ci/docker/linux/jenkins/apt-packages.txt,target=/tmp/apt-packages.txt \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
     apt-get update -y &&  \
-    < /tmp/apt-packages.txt xargs apt-get install -y && \
-    apt-get install -y --no-install-recommends  && \
-    rm -rf /var/lib/apt/lists/*
+    < /tmp/apt-packages.txt xargs apt-get install -y --no-install-recommends
+
+COPY --from=uv_builder /uv /uvx /bin/
 
 # =============================================================================
 FROM base AS conan_builder
-RUN --mount=type=cache,target=/var/cache/apt \
-    rm -f /etc/apt/apt.conf.d/docker-clean && \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && \
-    apt-get install -y --no-install-recommends jq && \
-    rm -rf /var/lib/apt/lists/*
+    apt-get install -y --no-install-recommends jq
+
 ARG CONAN_HOME
-COPY ci/docker/shared/conan/remotes.json  ${CONAN_HOME}/remotes.json
-ARG PIP_INDEX_URL
+COPY ci/docker/shared/conan/remotes.json ${CONAN_HOME}/remotes.json
+COPY ci/docker/linux/jenkins/conan/profile.ini ${CONAN_HOME}/profiles/default
 ARG CONAN_CENTER_PROXY_V2_URL
 ARG UV_CACHE_DIR
-ARG PIP_CACHE_DIR
 ENV UV_PROJECT=/tmp/project \
     UV_FROZEN=1
 ARG CONAN_DOWNLOAD_CACHE=/tmp/conan_download_cache
-RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
-    --mount=type=cache,target=${UV_CACHE_DIR} \
+ARG UV_PROJECT_ENVIRONMENT=/tmp/uv_project_environment
+RUN --mount=type=cache,target=${UV_CACHE_DIR} \
     --mount=type=cache,target=${CONAN_DOWNLOAD_CACHE} \
+    --mount=type=cache,target=${UV_PROJECT_ENVIRONMENT} \
     --mount=type=bind,source=uv.lock,target=${UV_PROJECT}/uv.lock \
     --mount=type=bind,source=pyproject.toml,target=${UV_PROJECT}/pyproject.toml \
     --mount=type=bind,source=conanfile.py,target=/tmp/conanfile.py \
     --mount=type=bind,source=conan.lock,target=/tmp/conan.lock \
-    python3 -m venv venv && \
-    ./venv/bin/pip --disable-pip-version-check install uv && \
-    ./venv/bin/uv run --only-group=build conan profile detect --exist-ok &&  \
+    uv run --only-group=build conan profile detect --exist-ok &&  \
     cp ${CONAN_HOME}/global.conf /tmp/global.conf.original && \
     echo "core.sources:download_cache = $CONAN_DOWNLOAD_CACHE" >> ${CONAN_HOME}/global.conf && \
     if [ "$(jq -r '.remotes[0].url' ${CONAN_HOME}/remotes.json )" != "${CONAN_CENTER_PROXY_V2_URL}" ]; then \
         echo "Setting the conan center url for building cache: ${CONAN_CENTER_PROXY_V2_URL}" && \
         cp ${CONAN_HOME}/remotes.json /tmp/remotes.json && \
-        ./venv/bin/uv run --only-group=build conan remote update conan-center --url ${CONAN_CENTER_PROXY_V2_URL}; \
+        uv run --only-group=build conan remote update conan-center --url ${CONAN_CENTER_PROXY_V2_URL}; \
     fi && \
-    ./venv/bin/uv run --only-group=build conan install /tmp -pr:b=default --build missing -pr:b=default && \
-    ./venv/bin/uv run --only-group=build conan cache clean "*" -b --source --build --temp && \
-    rm -rf venv && \
+    uv run --only-group=build conan install /tmp --build missing -pr:b=default && \
+    uv run --only-group=build conan cache clean "*" -b --source --build --temp && \
     if [ "$(jq -r '.remotes[0].url' ${CONAN_HOME}/remotes.json )" != "${CONAN_CENTER_PROXY_V2_URL}" ]; then \
       mv -f /tmp/remotes.json ${CONAN_HOME}/remotes.json; \
     fi && \
@@ -66,7 +64,6 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
 FROM base
 ARG CONAN_USER_HOME
 ARG CONAN_HOME
-COPY --from=conan_builder ${CONAN_HOME}/ ${CONAN_HOME}/
+COPY --from=conan_builder --chmod=777 ${CONAN_HOME}/ ${CONAN_HOME}/
 ENV CONAN_USER_HOME=${CONAN_USER_HOME} \
     CONAN_HOME=${CONAN_HOME}
-RUN  chmod -R 777 ${CONAN_HOME}

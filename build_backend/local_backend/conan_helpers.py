@@ -4,11 +4,13 @@ import logging
 import os
 import pathlib
 import copy
-import shutil
 import sys
 import sysconfig
 from typing import List, Type, Callable
 from . import utils
+
+from conan.api.conan_api import ConanAPI
+from conan.cli.cli import Cli
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -26,11 +28,8 @@ class AbsConanCommandBuilder(abc.ABC):
 
 class BaseConanCommandBuilder(AbsConanCommandBuilder):
     def get_install_command(self, build_path: str) -> List[str]:
-        conan = shutil.which("conan", path=os.path.dirname(sys.executable))
-        if not conan:
-            raise FileNotFoundError("Conan executable not found")
+        search_path = os.path.dirname(sys.executable)
         conan_command = [
-            conan,
             "install",
             self.conanfile or ".",
             "--build=missing",
@@ -144,4 +143,7 @@ def conan_install(
 ) -> None:
     command_builder = ConanCommandBuilder(builder=default_conan_command_builder()())
     command_builder.conanfile = conanfile
-    spawn_cmd(command_builder.get_install_command(build_path))
+    conan_api = ConanAPI()
+    cli = Cli(conan_api)
+    cli.add_commands()
+    conan_api.command.run(command_builder.get_install_command(build_path))

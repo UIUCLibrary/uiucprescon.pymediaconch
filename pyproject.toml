@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools"]
+requires = ["setuptools", "conan>2.0", "nanobind", "cmake"]
 build-backend = "local_backend"
 backend-path = ["build_backend"]
 
