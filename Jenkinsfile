@@ -54,9 +54,6 @@ def createUnixUvConfig(){
     }
     return sh(label: 'Setting up uv.toml config file', script: "sh ${scriptFile} " + '$UV_INDEX_URL $UV_EXTRA_INDEX_URL', returnStdout: true).trim()
 }
-def getUnixLogicalProcessor(){
-    return sh(label: 'Getting the total number of logical cores', script: 'grep -c ^processor /proc/cpuinfo', returnStdout: true).trim()
-}
 
 def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelStashes, retryTimes){
     def selectedArches = []
@@ -898,14 +895,12 @@ pipeline {
                                                                 image.inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share/uv/credentials --tmpfs /cache:exec -e TOX_WORK_DIR=/cache/tox -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment') {
                                                                     withEnv([
                                                                         "UV_CONFIG_FILE=${createUnixUvConfig()}",
-                                                                        "UV_CONCURRENT_BUILDS=${getUnixLogicalProcessor()}",
-                                                                        "UV_CONCURRENT_INSTALLS=${getUnixLogicalProcessor()}",
                                                                         "UV_LOCK_TIMEOUT=600"
                                                                         ]){
                                                                         retry(retryTimes){
                                                                             try{
                                                                                 sh( label: 'Running Tox',
-                                                                                    script: "uv run --only-group=tox --python-preference system tox run -e ${toxEnv} -vv"
+                                                                                    script: "uv run --only-group=tox --python-preference system tox run -e ${toxEnv} --runner uv-venv-lock-runner -vv"
                                                                                     )
                                                                             } catch(e){
                                                                                 cleanWs(
@@ -999,7 +994,7 @@ pipeline {
                                                                             ]){
                                                                                 bat(label: 'Running Tox',
                                                                                     script: """uv python install cpython-${version}
-                                                                                               uv run --only-group=tox tox run -e ${toxEnv} -vv
+                                                                                               uv run --only-group=tox tox run -e ${toxEnv} --runner uv-venv-lock-runner -vv
                                                                                             """
                                                                                 )
                                                                             }
