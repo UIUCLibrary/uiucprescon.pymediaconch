@@ -57,7 +57,8 @@ def createUnixUvConfig(){
 def getUnixLogicalProcessor(){
     return sh(label: 'Getting the total number of logical cores', script: 'grep -c ^processor /proc/cpuinfo', returnStdout: true).trim()
 }
-def linux_wheels(nonabi3PythonVersions, abi3PythonVersions, testPackages, params, wheelStashes, retryTimes){
+
+def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelStashes, retryTimes){
     def selectedArches = []
     def allValidArches = [
         // Arm64 on linux won't build libcurl
@@ -70,81 +71,7 @@ def linux_wheels(nonabi3PythonVersions, abi3PythonVersions, testPackages, params
     if(params.INCLUDE_LINUX_X86_64 == true){
         selectedArches << 'x86_64'
     }
-    def buildStages = [failFast: true]
-    buildStages << allValidArches.collectEntries{ arch ->
-        def newVersionStage = "Python ABI3 wheel - Linux ${arch}"
-        return [
-            "${newVersionStage}": {
-                stage(newVersionStage) {
-                    if(selectedArches.contains(arch)){
-                        stage("Build Wheel ABI3 wheel - Linux ${arch})"){
-                            retry(conditions: [agent()], count: 2) {
-                                node("linux && docker && ${arch}"){
-                                    retry(retryTimes){
-                                        checkout scm
-                                        try{
-                                            def dockerImageName = "${currentBuild.fullProjectName}_${UUID.randomUUID().toString()}".replaceAll("-", "_").replaceAll('/', "_").replaceAll(' ', "").toLowerCase()
-                                            try{
-                                                withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
-                                                    sh( script: "scripts/build_linux_wheels.sh --python-version abi3 --docker-image-name  ${dockerImageName}")
-                                                }
-                                                stash includes: 'dist/*manylinux*.*whl', name: "python abi3 linux - ${arch} - wheel"
-                                                wheelStashes << "python abi3 linux - ${arch} - wheel"
-                                                archiveArtifacts artifacts: 'dist/*manylinux*.*whl'
-                                            } finally {
-                                                sh "docker image rm --no-prune ${dockerImageName}"
-                                            }
-                                        } finally{
-                                            sh "${tool(name: 'Default', type: 'git')} clean -dffx"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        stage('Testing Python ABI3 wheel') {
-                            if(testPackages != true){
-                                Utils.markStageSkippedForConditional('Testing Python ABI3 wheel')
-                            } else {
-                                parallel([:] << abi3PythonVersions.collectEntries{pythonVersion ->
-                                    return [
-                                        "Testing abi3 wheel on Linux - Python ${pythonVersion} - ${arch}": {
-                                            node("linux && docker && ${arch}"){
-                                                checkout scm
-                                                try{
-                                                    withEnv([
-                                                        'PIP_CACHE_DIR=/tmp/pipcache',
-                                                        'UV_TOOL_DIR=/tmp/uvtools',
-                                                        'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
-                                                        'UV_CACHE_DIR=/tmp/uvcache',
-                                                    ]){
-                                                        docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec') {
-                                                            unstash "python abi3 linux - ${arch} - wheel"
-                                                            findFiles(glob: 'dist/*manylinux*.*whl').each{
-                                                                timeout(60){
-                                                                    sh(label: 'Running Tox',
-                                                                       script: """python3 -m venv venv
-                                                                       ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                       ./venv/bin/uv run --only-group dev --with tox_uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                } finally {
-                                                    sh "${tool(name: 'Default', type: 'git')} clean -dfx"
-                                                }
-                                            }
-                                        }
-                                    ]
-                                })
-                            }
-                        }
-                    }
-                }
-            }
-        ]
-    }
-    buildStages << nonabi3PythonVersions.collectEntries{ pythonVersion ->
+    return pythonVersions.collectEntries{ pythonVersion ->
         def newVersionStage = "Python ${pythonVersion} - Linux"
         return [
             "${newVersionStage}": {
@@ -227,10 +154,97 @@ def linux_wheels(nonabi3PythonVersions, abi3PythonVersions, testPackages, params
             }
         ]
     }
-    parallel(buildStages)
 }
 
-def mac_wheels(pythonVersionsNonAbi3, pythonVersionsTotestAbi3Wheels, testPackages, params, wheelStashes, retryTimes){
+def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheelStashes, retryTimes){
+    def selectedArches = []
+    def allValidArches = [
+        // Arm64 on linux won't build libcurl
+        //'arm64',
+        'x86_64'
+    ]
+//     if(params.INCLUDE_LINUX_ARM == true){
+//         selectedArches << 'arm64'
+//     }
+    if(params.INCLUDE_LINUX_X86_64 == true){
+        selectedArches << 'x86_64'
+    }
+    return allValidArches.collectEntries{ arch ->
+        def newVersionStage = "Python ABI3 wheel - Linux ${arch}"
+        return [
+            "${newVersionStage}": {
+                stage(newVersionStage) {
+                    if(selectedArches.contains(arch)){
+                        stage("Build Wheel ABI3 wheel - Linux ${arch})"){
+                            retry(conditions: [agent()], count: 2) {
+                                node("linux && docker && ${arch}"){
+                                    retry(retryTimes){
+                                        checkout scm
+                                        try{
+                                            def dockerImageName = "${currentBuild.fullProjectName}_${UUID.randomUUID().toString()}".replaceAll("-", "_").replaceAll('/', "_").replaceAll(' ', "").toLowerCase()
+                                            try{
+                                                withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                                    sh( script: "scripts/build_linux_wheels.sh --python-version abi3 --docker-image-name  ${dockerImageName}")
+                                                }
+                                                stash includes: 'dist/*manylinux*.*whl', name: "python abi3 linux - ${arch} - wheel"
+                                                wheelStashes << "python abi3 linux - ${arch} - wheel"
+                                                archiveArtifacts artifacts: 'dist/*manylinux*.*whl'
+                                            } finally {
+                                                sh "docker image rm --no-prune ${dockerImageName}"
+                                            }
+                                        } finally{
+                                            sh "${tool(name: 'Default', type: 'git')} clean -dffx"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        stage('Testing Python ABI3 wheel') {
+                            if(testPackages != true){
+                                Utils.markStageSkippedForConditional('Testing Python ABI3 wheel')
+                            } else {
+                                parallel([:] << abi3PythonVersions.collectEntries{pythonVersion ->
+                                    return [
+                                        "Testing abi3 wheel on Linux - Python ${pythonVersion} - ${arch}": {
+                                            node("linux && docker && ${arch}"){
+                                                checkout scm
+                                                try{
+                                                    withEnv([
+                                                        'PIP_CACHE_DIR=/tmp/pipcache',
+                                                        'UV_TOOL_DIR=/tmp/uvtools',
+                                                        'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
+                                                        'UV_CACHE_DIR=/tmp/uvcache',
+                                                    ]){
+                                                        docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec') {
+                                                            unstash "python abi3 linux - ${arch} - wheel"
+                                                            findFiles(glob: 'dist/*manylinux*.*whl').each{
+                                                                timeout(60){
+                                                                    sh(label: 'Running Tox',
+                                                                       script: """python3 -m venv venv
+                                                                       ./venv/bin/python -m pip install --disable-pip-version-check uv
+                                                                       ./venv/bin/uv run --only-group dev --with tox_uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                } finally {
+                                                    sh "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                                }
+                                            }
+                                        }
+                                    ]
+                                })
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    }
+}
+
+def get_mac_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params, wheelStashes, retryTimes){
     def selectedArches = []
     def allValidArches = ['arm64', 'x86_64']
     if(params.INCLUDE_MACOS_X86_64 == true){
@@ -239,69 +253,7 @@ def mac_wheels(pythonVersionsNonAbi3, pythonVersionsTotestAbi3Wheels, testPackag
     if(params.INCLUDE_MACOS == true){
         selectedArches << 'arm64'
     }
-    def buildStages = [:]
-    buildStages['Python ABI3 wheel'] = {
-        stage('Python ABI3 wheel') {
-            stage('Building Python ABI3 wheel') {
-                node('mac && python3 && arm64'){
-                    checkout scm
-                    timeout(60){
-                        try{
-                            withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
-                                sh(label: 'Building Python ABI3 wheel', script: "scripts/build_mac_wheel.sh abi3")
-                                stash includes: 'dist/*.whl', name: 'python abi3 wheel'
-                            }
-                        } finally {
-                            sh "${tool(name: 'Default', type: 'git')} clean -dffx"
-                        }
-                    }
-                }
-            }
-            stage('Testing Python ABI3 wheel') {
-                if(testPackages != true){
-                    Utils.markStageSkippedForConditional('Testing Python ABI3 wheel')
-                }
-                parallel([:] << allValidArches.collectEntries{arch ->
-                    def testingStages = [:]
-                    pythonVersionsTotestAbi3Wheels.each{pythonVersion ->
-                        def newWheelStage = "Testing ABI3 wheel on MacOS - Python ${pythonVersion} - ${arch}"
-                        testingStages[newWheelStage] = {
-                            if(testPackages == true && selectedArches.contains(arch)){
-                                node("mac && python${pythonVersion} && ${arch}"){
-                                    checkout scm
-                                    try{
-                                        unstash 'python abi3 wheel'
-                                        findFiles(glob: 'dist/*.whl').each{
-                                            timeout(60){
-                                                sh(label: 'Running Tox',
-                                                   script: """python${pythonVersion} -m venv venv
-                                                   ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                   ./venv/bin/uv run --only-group dev --with tox_uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
-                                                )
-                                            }
-                                        }
-                                    } finally {
-                                        sh "${tool(name: 'Default', type: 'git')} clean -dffx"
-                                    }
-                                }
-                            } else {
-                                Utils.markStageSkippedForConditional(newWheelStage)
-                            }
-                        }
-                    }
-
-                    return testingStages
-                })
-//                     "Test Wheel abi3 wheel on MacOS ${arch}": {
-//                         stage("Test Wheel abi3 wheel on MacOS ${arch}"){
-//                             echo 'here'
-//                         }
-//                     }
-//                 })
-            }
-        }
-    }
-    buildStages << pythonVersionsNonAbi3.collectEntries{ pythonVersion ->
+    return pythonVersionsNonAbi3.collectEntries{ pythonVersion ->
         [
             "Python ${pythonVersion} - Mac":{
                 stage("Python ${pythonVersion} - Mac"){
@@ -372,11 +324,182 @@ def mac_wheels(pythonVersionsNonAbi3, pythonVersionsTotestAbi3Wheels, testPackag
                     }
                 }
             }
-        ]}
-    parallel(buildStages)
+        ]
+    }
 }
-def windows_wheels(pythonVersionsNonAbi3, pythonVersionsAbi3, testPackages, params, wheelStashes, retryTimes, sharedPipCacheVolumeName){
-    def buildStages = [failFast: true]
+def get_mac_abi3_wheel_stages(pythonVersionsTotestAbi3Wheels, testPackages, params, wheelStashes, retryTimes){
+    def selectedArches = []
+    def allValidArches = ['arm64', 'x86_64']
+    if(params.INCLUDE_MACOS_X86_64 == true){
+        selectedArches << 'x86_64'
+    }
+    if(params.INCLUDE_MACOS == true){
+        selectedArches << 'arm64'
+    }
+    def buildStages = [:]
+    buildStages['Python ABI3 wheel'] = {
+        stage('Python ABI3 wheel') {
+            stage('Building Python ABI3 wheel') {
+                node('mac && python3 && arm64'){
+                    checkout scm
+                    timeout(60){
+                        try{
+                            withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                sh(label: 'Building Python ABI3 wheel', script: "scripts/build_mac_wheel.sh abi3")
+                                stash includes: 'dist/*.whl', name: 'python abi3 wheel'
+                            }
+                        } finally {
+                            sh "${tool(name: 'Default', type: 'git')} clean -dffx"
+                        }
+                    }
+                }
+            }
+            stage('Testing Python ABI3 wheel') {
+                if(testPackages != true){
+                    Utils.markStageSkippedForConditional('Testing Python ABI3 wheel')
+                }
+                parallel([:] << allValidArches.collectEntries{arch ->
+                    def testingStages = [:]
+                    pythonVersionsTotestAbi3Wheels.each{pythonVersion ->
+                        def newWheelStage = "Testing ABI3 wheel on MacOS - Python ${pythonVersion} - ${arch}"
+                        testingStages[newWheelStage] = {
+                            if(testPackages == true && selectedArches.contains(arch)){
+                                node("mac && python${pythonVersion} && ${arch}"){
+                                    checkout scm
+                                    try{
+                                        unstash 'python abi3 wheel'
+                                        findFiles(glob: 'dist/*.whl').each{
+                                            timeout(60){
+                                                sh(label: 'Running Tox',
+                                                   script: """python${pythonVersion} -m venv venv
+                                                   ./venv/bin/python -m pip install --disable-pip-version-check uv
+                                                   ./venv/bin/uv run --only-group dev --with tox_uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                )
+                                            }
+                                        }
+                                    } finally {
+                                        sh "${tool(name: 'Default', type: 'git')} clean -dffx"
+                                    }
+                                }
+                            } else {
+                                Utils.markStageSkippedForConditional(newWheelStage)
+                            }
+                        }
+                    }
+
+                    return testingStages
+                })
+            }
+        }
+    }
+
+    return buildStages
+}
+def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params, wheelStashes, retryTimes, sharedPipCacheVolumeName){
+    return pythonVersionsNonAbi3.collectEntries{ pythonVersion ->
+        def newStage = "Python ${pythonVersion} - Windows"
+        [
+            "${newStage}": {
+                stage(newStage){
+                    if(params.INCLUDE_WINDOWS_X86_64 == true){
+                        stage("Build Wheel (${pythonVersion} Windows)"){
+                            retry(conditions: [agent()], count: 2) {
+                                node('windows && docker && x86_64'){
+                                    def dockerImageName = "${currentBuild.fullProjectName}_${UUID.randomUUID().toString()}".replaceAll("-", "_").replaceAll('/', "_").replaceAll(' ', "").toLowerCase()
+                                    try{
+                                        checkout scm
+                                        try{
+                                            retry(retryTimes){
+                                                try{
+                                                    withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
+                                                        powershell(label: 'Building Wheel for Windows', script: "scripts/build_windows.ps1 -PythonVersion ${pythonVersion} -DockerImageName ${dockerImageName}")
+                                                    }
+                                                } catch(e){
+                                                    cleanWs(
+                                                        patterns: [
+                                                            [pattern: 'dist/', type: 'INCLUDE'],
+                                                            [pattern: 'build/', type: 'INCLUDE'],
+                                                            [pattern: '**/__pycache__/', type: 'INCLUDE'],
+                                                        ],
+                                                        notFailBuild: true,
+                                                        deleteDirs: true
+                                                    )
+                                                    throw e
+                                                }
+                                            }
+                                            stash includes: 'dist/*.whl', name: "python${pythonVersion} windows wheel"
+                                            wheelStashes << "python${pythonVersion} windows wheel"
+                                            archiveArtifacts artifacts: 'dist/*.whl'
+                                        } finally {
+                                            bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                        }
+                                    } finally {
+                                        powershell(
+                                            label: "Untagging Docker Image used",
+                                            script: "docker image rm --no-prune ${dockerImageName}",
+                                            returnStatus: true
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        def wheelTestingStageName = "Test Wheel (${pythonVersion} Windows)"
+                        stage(wheelTestingStageName){
+                            if(testPackages == true){
+                                retry(conditions: [agent()], count: 2) {
+                                    node('windows && docker'){
+                                        withEnv([
+                                            'PIP_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\pipcache',
+                                            'UV_TOOL_DIR=C:\\Users\\ContainerUser\\Documents\\uvtools',
+                                            'UV_PYTHON_INSTALL_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
+                                            'UV_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvcache',
+                                        ]){
+                                            checkout scm
+                                            try{
+                                                docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside("--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython --mount source=msvc-runtime,target=c:\\msvc_runtime --mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
+                                                    retry(retryTimes){
+                                                        try{
+                                                            withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
+                                                                unstash "python${pythonVersion} windows wheel"
+                                                                findFiles(glob: 'dist/*.whl').each{
+                                                                    bat """python -m pip install --disable-pip-version-check uv
+                                                                           uv run --only-group=tox -p ${pythonVersion} tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
+                                                                        """
+                                                                }
+                                                            }
+                                                        } catch (e){
+                                                            cleanWs(
+                                                                patterns: [
+                                                                    [pattern: '.tox/', type: 'INCLUDE'],
+                                                                    [pattern: '**/__pycache__/', type: 'INCLUDE'],
+                                                                ],
+                                                                notFailBuild: true,
+                                                                deleteDirs: true
+                                                            )
+                                                            throw e
+                                                        }
+                                                    }
+                                                }
+                                            } finally {
+                                                bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Utils.markStageSkippedForConditional(wheelTestingStageName)
+                            }
+                        }
+                    } else {
+                        Utils.markStageSkippedForConditional(newStage)
+                    }
+                }
+            }
+        ]
+    }
+}
+def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, wheelStashes, retryTimes, sharedPipCacheVolumeName){
+    def buildStages = [:]
     buildStages['Python ABI3 wheel'] = {
         stage('Python ABI3 wheel') {
             stage('Building Python ABI3 wheel') {
@@ -479,108 +602,7 @@ def windows_wheels(pythonVersionsNonAbi3, pythonVersionsAbi3, testPackages, para
             }
         }
     }
-    buildStages << pythonVersionsNonAbi3.collectEntries{ pythonVersion ->
-        def newStage = "Python ${pythonVersion} - Windows"
-        [
-            "${newStage}": {
-                stage(newStage){
-                    if(params.INCLUDE_WINDOWS_X86_64 == true){
-                        stage("Build Wheel (${pythonVersion} Windows)"){
-                            retry(conditions: [agent()], count: 2) {
-                                node('windows && docker && x86_64'){
-                                    def dockerImageName = "${currentBuild.fullProjectName}_${UUID.randomUUID().toString()}".replaceAll("-", "_").replaceAll('/', "_").replaceAll(' ', "").toLowerCase()
-                                    try{
-                                        checkout scm
-                                        try{
-                                            retry(retryTimes){
-                                                try{
-                                                    withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
-                                                        powershell(label: 'Building Wheel for Windows', script: "scripts/build_windows.ps1 -PythonVersion ${pythonVersion} -DockerImageName ${dockerImageName}")
-                                                    }
-                                                } catch(e){
-                                                    cleanWs(
-                                                        patterns: [
-                                                            [pattern: 'dist/', type: 'INCLUDE'],
-                                                            [pattern: 'build/', type: 'INCLUDE'],
-                                                            [pattern: '**/__pycache__/', type: 'INCLUDE'],
-                                                        ],
-                                                        notFailBuild: true,
-                                                        deleteDirs: true
-                                                    )
-                                                    throw e
-                                                }
-                                            }
-                                            stash includes: 'dist/*.whl', name: "python${pythonVersion} windows wheel"
-                                            wheelStashes << "python${pythonVersion} windows wheel"
-                                            archiveArtifacts artifacts: 'dist/*.whl'
-                                        } finally {
-                                            bat "${tool(name: 'Default', type: 'git')} clean -dfx"
-                                        }
-                                    } finally {
-                                        powershell(
-                                            label: "Untagging Docker Image used",
-                                            script: "docker image rm --no-prune ${dockerImageName}",
-                                            returnStatus: true
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        def wheelTestingStageName = "Test Wheel (${pythonVersion} Windows)"
-                        stage(wheelTestingStageName){
-                            if(testPackages == true){
-                                retry(conditions: [agent()], count: 2) {
-                                    node('windows && docker'){
-                                        withEnv([
-                                            'PIP_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\pipcache',
-                                            'UV_TOOL_DIR=C:\\Users\\ContainerUser\\Documents\\uvtools',
-                                            'UV_PYTHON_INSTALL_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
-                                            'UV_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvcache',
-                                        ]){
-                                            checkout scm
-                                            try{
-                                                docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside("--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython --mount source=msvc-runtime,target=c:\\msvc_runtime --mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
-                                                    retry(retryTimes){
-                                                        try{
-                                                            withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
-                                                                unstash "python${pythonVersion} windows wheel"
-                                                                findFiles(glob: 'dist/*.whl').each{
-                                                                    bat """python -m pip install --disable-pip-version-check uv
-                                                                           uv run --only-group=tox -p ${pythonVersion} tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
-                                                                        """
-                                                                }
-                                                            }
-                                                        } catch (e){
-                                                            cleanWs(
-                                                                patterns: [
-                                                                    [pattern: '.tox/', type: 'INCLUDE'],
-                                                                    [pattern: '**/__pycache__/', type: 'INCLUDE'],
-                                                                ],
-                                                                notFailBuild: true,
-                                                                deleteDirs: true
-                                                            )
-                                                            throw e
-                                                        }
-                                                    }
-                                                }
-                                            } finally {
-                                                bat "${tool(name: 'Default', type: 'git')} clean -dfx"
-                                            }
-                                        }
-                                    }
-                                }
-                            } else {
-                                Utils.markStageSkippedForConditional(wheelTestingStageName)
-                            }
-                        }
-                    } else {
-                        Utils.markStageSkippedForConditional(newStage)
-                    }
-                }
-            }
-        ]
-    }
-    parallel(buildStages)
+    return buildStages
 
 }
 
@@ -1027,7 +1049,13 @@ pipeline {
                         }
                     }
                     steps{
-                        linux_wheels(SUPPORTED_LINUX_VERSIONS_NONABI3, SUPPORTED_LINUX_VERSIONS_ABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes)
+                        script{
+                            parallel(
+                                [failFast: true] +
+                                get_linux_abi3_wheels_stages(SUPPORTED_LINUX_VERSIONS_ABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes) +
+                                get_linux_nonabi3_wheels_stages(SUPPORTED_LINUX_VERSIONS_NONABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes)
+                            )
+                        }
                     }
                 }
                 stage('Platform Wheels: Mac'){
@@ -1038,7 +1066,13 @@ pipeline {
                         }
                     }
                     steps{
-                        mac_wheels(SUPPORTED_MAC_VERSIONS_NONABI3, SUPPORTED_MAC_VERSIONS_ABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes)
+                        script{
+                            parallel(
+                                [failFast: true] +
+                                get_mac_nonabi3_wheel_stages(SUPPORTED_MAC_VERSIONS_NONABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes) +
+                                get_mac_abi3_wheel_stages(SUPPORTED_MAC_VERSIONS_ABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes)
+                            )
+                        }
                     }
                 }
                 stage('Platform Wheels: Windows'){
@@ -1046,7 +1080,13 @@ pipeline {
                         equals expected: true, actual: params.INCLUDE_WINDOWS_X86_64
                     }
                     steps{
-                        windows_wheels(SUPPORTED_WINDOWS_VERSIONS_NONABI3, SUPPORTED_WINDOWS_VERSIONS_ABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes, SHARED_PIP_CACHE_VOLUME_NAME)
+                        script{
+                            parallel(
+                                [failFast: true] +
+                                get_windows_nonabi3_wheel_stages(SUPPORTED_WINDOWS_VERSIONS_NONABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes, SHARED_PIP_CACHE_VOLUME_NAME) +
+                                get_windows_abi3_wheel_stages(SUPPORTED_WINDOWS_VERSIONS_ABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes, SHARED_PIP_CACHE_VOLUME_NAME)
+                            )
+                        }
                     }
                 }
                 stage('Source Distribution Package'){
