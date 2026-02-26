@@ -34,7 +34,7 @@ generate_wheel_with_uv(){
     search_pattern="$out_temp_wheels_dir/*.whl"
     echo 'Fixing up wheel'
     for file in $search_pattern; do
-          results=$("$uv" tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$constraints" --from=delocate delocate-listdeps --depending "${file}")
+          results=$("$uv" tool run --python="$pythonVersion" --constraint "$constraints" --from=delocate delocate-listdeps --depending "${file}")
           if [ -n "$results" ]; then
             echo ""
             echo "================================================================================"
@@ -46,7 +46,7 @@ generate_wheel_with_uv(){
             file_name=$(basename "$file")
             echo "$file_name is not linked to anything"
           fi
-          $uv tool run --python="$pythonVersion" --index-strategy=unsafe-first-match --constraint "$constraints" --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "${file}"
+          $uv tool run --python="$pythonVersion" --constraint "$constraints" --from=delocate delocate-wheel -w $output_path --require-archs "$REQUIRED_ARCH" --verbose "${file}"
     done
 }
 
