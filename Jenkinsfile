@@ -657,7 +657,7 @@ pipeline {
                                                 try{
                                                     sh(
                                                         label: 'Create virtual environment',
-                                                        script: 'uv sync --frozen --group=ci -v'
+                                                        script: 'uv sync --frozen --group=ci --no-install-project -v'
                                                    )
                                                 } catch(e){
                                                     cleanWs(
@@ -688,7 +688,7 @@ pipeline {
                                             script: '''mkdir -p build/python
                                                        mkdir -p logs
                                                        mkdir -p reports
-                                                       uv run setup.py build_ext --inplace --build-temp build/temp  --build-lib build/lib --debug
+                                                       uv run setup.py build_ext --inplace --build-temp build/temp  --build-lib build/lib --debug develop
                                                        '''
                                         )
                                     }
