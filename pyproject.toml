@@ -58,5 +58,19 @@ version_provider = "pep621"
 update_changelog_on_bump = true
 major_version_zero = true
 
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "conanfile.py" },
+    { file = "conan.lock" },
+    { file = "setup.py" },
+    { file = "CMakeLists.txt" },
+    { file = "src/**/*.h" },
+    { file = "src/**/*.cpp" },
+    { file = "build_backend/local_backend/*.py" },
+    { env = "CONAN_HOME" },
+    { env = "CONAN_USER_HOME" },
+]
+
 [tool.uv.extra-build-dependencies]
 uiucprescon-pymediaconch = ["nanobind", "cmake", "conan>2.0"]

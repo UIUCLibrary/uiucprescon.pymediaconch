@@ -60,6 +60,7 @@ class BuildNanoBindExtension(_build_ext):
             )
 
         self.announce("Building extension with CMake", level=logging.INFO)
+
         cmake_helpers.build_cmake_extension(
             build_path,
             self.build_lib,
@@ -72,4 +73,5 @@ class BuildNanoBindExtension(_build_ext):
         if sys.version_info >= (3, 12):
             self.get_finalized_command("bdist_wheel").py_limited_api = "cp312"
         else:
+            ext.py_limited_api = False
             self.get_finalized_command("bdist_wheel").py_limited_api = False
