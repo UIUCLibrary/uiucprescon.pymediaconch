@@ -15,4 +15,6 @@ def get_mac_deploy_target():
         and int(python_built_with.split(".")[1]) < 13
     ):
         return "10.13"
+    if len(python_built_with.split(".")) == 1:
+        return f"{python_built_with}.0"
     return python_built_with
