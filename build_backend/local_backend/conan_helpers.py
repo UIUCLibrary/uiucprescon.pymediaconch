@@ -4,6 +4,7 @@ import logging
 import os
 import pathlib
 import copy
+import pprint
 import sys
 import sysconfig
 from typing import List, Type, Callable
@@ -50,7 +51,10 @@ class MacOSConanCommandBuilder(BaseConanCommandBuilder):
                 arches.append(key[arch])
 
         if len(arches) == 0:
-            print(f"Unable to determine architecture. CONFIGURE_CFLAGS = {cflags}")
+            if cflags:
+                print(f"Unable to determine architecture. CONFIGURE_CFLAGS = {cflags}")
+            else:
+                pprint.pprint(sysconfig.get_config_vars())
             raise ValueError("No valid architecture found")
         return arches
 
