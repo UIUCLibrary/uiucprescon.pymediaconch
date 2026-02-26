@@ -219,7 +219,7 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                                     sh(label: 'Running Tox',
                                                                        script: """python3 -m venv venv
                                                                        ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                       ./venv/bin/uv run --only-group dev --with tox_uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                       ./venv/bin/uv run --only-group=tox tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
                                                                     )
                                                                 }
                                                             }
@@ -370,7 +370,7 @@ def get_mac_abi3_wheel_stages(pythonVersionsTotestAbi3Wheels, testPackages, para
                                                 sh(label: 'Running Tox',
                                                    script: """python${pythonVersion} -m venv venv
                                                    ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                   ./venv/bin/uv run --only-group dev --with tox_uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                   ./venv/bin/uv run --only-group=tox tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
                                                 )
                                             }
                                         }
