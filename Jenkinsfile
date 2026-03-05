@@ -211,6 +211,7 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                         'UV_TOOL_DIR=/tmp/uvtools',
                                                         'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
                                                         'UV_CACHE_DIR=/tmp/uvcache',
+                                                        "TOX_UV_PATH=${WORKSPACE}/venv/bin/uv"
                                                     ]){
                                                         docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec') {
                                                             unstash "python abi3 linux - ${arch} - wheel"
@@ -938,7 +939,7 @@ pipeline {
                              environment{
                                  PIP_CACHE_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\pipcache'
                                  UV_TOOL_DIR='C:\\Users\\ContainerUser\\Documents\\uvtools'
-                                 UV_PYTHON_INSTALL_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\uvpython'
+                                 UV_PYTHON_CACHE_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\uvpython'
                                  UV_CACHE_DIR='C:\\Users\\ContainerUser\\Documents\\cache\\uvcache'
                              }
                              steps{
@@ -948,7 +949,7 @@ pipeline {
                                          checkout scm
                                          try{
                                             docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python')
-                                                .inside("--mount type=volume,source=uv_python_install_dir,target=${env.UV_PYTHON_INSTALL_DIR} " +
+                                                .inside("--mount type=volume,source=uv_python_cache_dir,target=${env.UV_PYTHON_CACHE_DIR} " +
                                                         "--mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} " +
                                                         "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                 ){
@@ -981,7 +982,7 @@ pipeline {
                                                         }
                                                         try{
                                                             try{
-                                                                image.inside("--mount type=volume,source=uv_python_install_dir,target=${env.UV_PYTHON_INSTALL_DIR} " +
+                                                                image.inside("--mount type=volume,source=uv_python_cache_dir,target=${env.UV_PYTHON_CACHE_DIR} " +
                                                                              "--mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} " +
                                                                              "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                                 ){
