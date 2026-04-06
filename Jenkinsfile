@@ -551,44 +551,42 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
                     parallel([failFast: true] << pythonVersionsAbi3.collectEntries{pythonVersion ->
                         return [
                             "Testing abi3 wheel on Windows - Python ${pythonVersion}": {
-                                node('windows && docker && x86_64'){
-                                    retry(conditions: [agent()], count: 2) {
-                                        node('windows && docker'){
-                                            withEnv([
-                                                'PIP_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\pipcache',
-                                                'UV_TOOL_DIR=C:\\Users\\ContainerUser\\Documents\\uvtools',
-                                                'UV_PYTHON_INSTALL_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
-                                                'UV_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvcache',
-                                            ]){
-                                                checkout scm
-                                                try{
-                                                    docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside("--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython --mount source=msvc-runtime,target=c:\\msvc_runtime --mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
-                                                        retry(retryTimes){
-                                                            try{
-                                                                withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
-                                                                    unstash 'python abi3 windows wheel'
-                                                                    findFiles(glob: 'dist/*.whl').each{
-                                                                        bat """python -m pip install --disable-pip-version-check uv
-                                                                               uv run --python ${pythonVersion}+gil --only-group=tox tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
-                                                                            """
-                                                                    }
+                                retry(conditions: [agent()], count: 2) {
+                                    node('windows && docker && x86_64'){
+                                        withEnv([
+                                            'PIP_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\pipcache',
+                                            'UV_TOOL_DIR=C:\\Users\\ContainerUser\\Documents\\uvtools',
+                                            'UV_PYTHON_INSTALL_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
+                                            'UV_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvcache',
+                                        ]){
+                                            checkout scm
+                                            try{
+                                                docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside("--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython --mount source=msvc-runtime,target=c:\\msvc_runtime --mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
+                                                    retry(retryTimes){
+                                                        try{
+                                                            withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
+                                                                unstash 'python abi3 windows wheel'
+                                                                findFiles(glob: 'dist/*.whl').each{
+                                                                    bat """python -m pip install --disable-pip-version-check uv
+                                                                           uv run --python ${pythonVersion}+gil --only-group=tox tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
+                                                                        """
                                                                 }
-                                                            } catch (e){
-                                                                cleanWs(
-                                                                    patterns: [
-                                                                        [pattern: '.tox/', type: 'INCLUDE'],
-                                                                        [pattern: '**/__pycache__/', type: 'INCLUDE'],
-                                                                    ],
-                                                                    notFailBuild: true,
-                                                                    deleteDirs: true
-                                                                )
-                                                                throw e
                                                             }
+                                                        } catch (e){
+                                                            cleanWs(
+                                                                patterns: [
+                                                                    [pattern: '.tox/', type: 'INCLUDE'],
+                                                                    [pattern: '**/__pycache__/', type: 'INCLUDE'],
+                                                                ],
+                                                                notFailBuild: true,
+                                                                deleteDirs: true
+                                                            )
+                                                            throw e
                                                         }
                                                     }
-                                                } finally {
-                                                    bat "${tool(name: 'Default', type: 'git')} clean -dfx"
                                                 }
+                                            } finally {
+                                                bat "${tool(name: 'Default', type: 'git')} clean -dfx"
                                             }
                                         }
                                     }
