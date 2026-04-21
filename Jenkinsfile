@@ -117,20 +117,16 @@ def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelS
                                                             checkout scm
                                                             unstash "python${pythonVersion} linux - ${arch} - wheel"
                                                             try{
-                                                                docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp')
+                                                                docker.image('ghcr.io/astral-sh/uv:debian').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp')
                                                                 {
-                                                                    withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}", "TOX_UV_PATH=${WORKSPACE}/venv/bin/uv"]){
+                                                                    withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}"]){
                                                                         def attempt = 0
                                                                         retry(2){
                                                                             attempt += 1
                                                                             withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                                 sh(
                                                                                     label: "Testing with tox ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                                    script: """python3 -m venv venv
-                                                                                               ./venv/bin/pip install --disable-pip-version-check uv
-                                                                                               trap "rm -rf venv" EXIT
-                                                                                               ./venv/bin/uv run --only-group=tox tox -e py${pythonVersion.replace('.', '')} --installpkg ${findFiles(glob:'dist/*.whl')[0].path} -vv
-                                                                                            """
+                                                                                    script: "uv run --only-group=tox tox -e py${pythonVersion.replace('.', '')} --installpkg ${findFiles(glob:'dist/*.whl')[0].path} -vv"
                                                                                 )
                                                                             }
                                                                         }
@@ -217,9 +213,8 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                         'UV_TOOL_DIR=/tmp/uvtools',
                                                         'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
                                                         'UV_CACHE_DIR=/tmp/uvcache',
-                                                        "TOX_UV_PATH=${WORKSPACE}/venv/bin/uv"
                                                     ]){
-                                                        docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec') {
+                                                        docker.image('ghcr.io/astral-sh/uv:debian').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec') {
                                                             unstash "python abi3 linux - ${arch} - wheel"
                                                             findFiles(glob: 'dist/*manylinux*.*whl').each{
                                                                 def attempt = 0
@@ -228,9 +223,7 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                                     withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                         timeout(60){
                                                                             sh(label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                               script: """python3 -m venv venv
-                                                                               ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                               ./venv/bin/uv run --only-group=tox tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                               script: "uv run --only-group=tox tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
                                                                             )
                                                                         }
                                                                     }
@@ -1151,7 +1144,7 @@ pipeline {
                         stage('Build sdist'){
                             agent {
                                 docker{
-                                    image 'python'
+                                    image 'ghcr.io/astral-sh/uv:debian'
                                     label 'linux && docker'
                                     args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'
                                   }
@@ -1167,16 +1160,12 @@ pipeline {
                                 script{
                                     try{
                                         sh(
-                                            label: 'Setting up uv',
-                                            script: 'python3 -m venv venv && venv/bin/pip install --disable-pip-version-check uv && venv/bin/uv export --frozen --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate > $UV_CONSTRAINT'
-                                        )
-                                        sh(
                                             label: 'Package',
-                                            script: './venv/bin/uv build --build-constraints $UV_CONSTRAINT --sdist'
+                                            script: 'uv build --sdist'
                                         )
                                         sh(
                                             label: 'Twine check',
-                                            script: './venv/bin/uv run --only-group=deploy twine check --strict  dist/*'
+                                            script: 'uv run --only-group=deploy twine check --strict  dist/*'
                                         )
                                         stash includes: 'dist/*.tar.gz,dist/*.zip', name: 'python sdist'
                                         archiveArtifacts artifacts: 'dist/*.tar.gz,dist/*.zip'
@@ -1359,11 +1348,7 @@ pipeline {
                                                                                             withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                                                 sh(
                                                                                                     label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                                                    script: """python3 -m venv venv
-                                                                                                               trap "rm -rf venv" EXIT
-                                                                                                               venv/bin/pip install --disable-pip-version-check uv
-                                                                                                               trap "rm -rf venv && rm -rf .tox" EXIT
-                                                                                                               venv/bin/uv run --python-preference system --only-group=tox tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                                                    script: "uv run --python-preference system --only-group=tox tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')} -vv"
                                                                                                     )
                                                                                             }
                                                                                         }
