@@ -61,7 +61,7 @@ function Build-Wheel {
     New-ShadowCopy -Source $SourceDirectory -Destination "$env:TEMP\build_src"
     $ConstrainstsFile = "$env:TEMP\constrainsts.txt"
 
-    uv export --only-group dev --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "$env:TEMP\build_src" > $ConstrainstsFile
+    uv export --only-group=dev --python=$PythonVersion --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "$env:TEMP\build_src" > $ConstrainstsFile
     Write-Host "Building wheel..."
     New-PythonWheel -Source "$env:TEMP\build_src" -Output "$env:TEMP\wheel_tmp" -PythonVersion $PythonVersion -BuildConstraints $ConstrainstsFile
 
