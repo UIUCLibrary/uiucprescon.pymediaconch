@@ -255,26 +255,36 @@ def get_mac_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params, wh
         [
             "Python ${pythonVersion} - Mac":{
                 stage("Python ${pythonVersion} - Mac"){
+                    if(params.INCLUDE_MACOS != true){
+                        Utils.markStageSkippedForConditional("Python ${pythonVersion} - Mac")
+                    }
                     stage("Wheel for Python ${pythonVersion}"){
+                        if(params.INCLUDE_MACOS != true){
+                            Utils.markStageSkippedForConditional("Wheel for Python ${pythonVersion}")
+                        }
                         stage('Build MacOS Universal2 Wheel'){
-                            node("mac && python${pythonVersion} && arm64"){
-                                checkout scm
-                                try{
-                                    timeout(60){
-                                        withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
-                                            sh(label: 'Building wheel', script: "scripts/build_mac_wheel.sh ${pythonVersion}")
+                            if(params.INCLUDE_MACOS != true){
+                                Utils.markStageSkippedForConditional('Build MacOS Universal2 Wheel')
+                            } else {
+                                node("mac && python${pythonVersion} && arm64"){
+                                    checkout scm
+                                    try{
+                                        timeout(60){
+                                            withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                                sh(label: 'Building wheel', script: "scripts/build_mac_wheel.sh ${pythonVersion}")
+                                            }
                                         }
+                                        stash includes: 'dist/*.whl', name: "python${pythonVersion} mac wheel"
+                                        wheelStashes << "python${pythonVersion} mac wheel"
+                                        archiveArtifacts artifacts: 'dist/*.whl'
+                                    } finally {
+                                        sh "${tool(name: 'Default', type: 'git')} clean -dffx"
                                     }
-                                    stash includes: 'dist/*.whl', name: "python${pythonVersion} mac wheel"
-                                    wheelStashes << "python${pythonVersion} mac wheel"
-                                    archiveArtifacts artifacts: 'dist/*.whl'
-                                } finally {
-                                    sh "${tool(name: 'Default', type: 'git')} clean -dffx"
                                 }
                             }
                         }
                         stage('Test Universal2 Wheel'){
-                            if(testPackages != true){
+                            if(testPackages != true || params.INCLUDE_MACOS != true){
                                 Utils.markStageSkippedForConditional('Test Universal2 Wheel')
                             }
                             parallel([failFast: true] << allValidArches.collectEntries{arch ->
@@ -282,30 +292,36 @@ def get_mac_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params, wh
                                 return [
                                     "${newWheelStage}": {
                                         stage(newWheelStage){
+                                            if(params.INCLUDE_MACOS != true){
+                                                Utils.markStageSkippedForConditional(newWheelStage)
+                                            }
                                             if(selectedArches.contains(arch)){
                                                 retry(conditions: [agent()], count: 2) {
-
-                                                }
-                                                if(testPackages == true){
-                                                    stage("Test Wheel (${pythonVersion} MacOS ${arch})"){
-                                                        retry(conditions: [agent()], count: 2) {
-                                                            node("mac && python${pythonVersion} && ${arch}"){
-                                                                checkout scm
-                                                                try{
-                                                                    withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
-                                                                        unstash "python${pythonVersion} mac wheel"
-                                                                        findFiles(glob: 'dist/*.whl').each{
-                                                                            timeout(60){
-                                                                                sh(label: 'Running Tox',
-                                                                                   script: """python${pythonVersion} -m venv venv
-                                                                                   ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                                   ./venv/bin/uv run --only-group=tox tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
-                                                                                )
+                                                    if(testPackages == true){
+                                                        stage("Test Wheel (${pythonVersion} MacOS ${arch})"){
+                                                            if(params.INCLUDE_MACOS != true){
+                                                                Utils.markStageSkippedForConditional("Test Wheel (${pythonVersion} MacOS ${arch})")
+                                                            } else {
+                                                                retry(conditions: [agent()], count: 2) {
+                                                                    node("mac && python${pythonVersion} && ${arch}"){
+                                                                        checkout scm
+                                                                        try{
+                                                                            withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                                                                unstash "python${pythonVersion} mac wheel"
+                                                                                findFiles(glob: 'dist/*.whl').each{
+                                                                                    timeout(60){
+                                                                                        sh(label: 'Running Tox',
+                                                                                           script: """python${pythonVersion} -m venv venv
+                                                                                           ./venv/bin/python -m pip install --disable-pip-version-check uv
+                                                                                           ./venv/bin/uv run --only-group=tox tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                                        )
+                                                                                    }
+                                                                                }
                                                                             }
+                                                                        } finally {
+                                                                            sh "${tool(name: 'Default', type: 'git')} clean -dfx"
                                                                         }
                                                                     }
-                                                                } finally {
-                                                                    sh "${tool(name: 'Default', type: 'git')} clean -dfx"
                                                                 }
                                                             }
                                                         }
@@ -337,23 +353,30 @@ def get_mac_abi3_wheel_stages(pythonVersionsTotestAbi3Wheels, testPackages, para
     def buildStages = [:]
     buildStages['Python ABI3 wheel'] = {
         stage('Python ABI3 wheel') {
+            if(params.INCLUDE_MACOS != true){
+                Utils.markStageSkippedForConditional('Python ABI3 wheel')
+            }
             stage('Building Python ABI3 wheel') {
-                node('mac && python3 && arm64'){
-                    checkout scm
-                    timeout(60){
-                        try{
-                            withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
-                                sh(label: 'Building Python ABI3 wheel', script: "scripts/build_mac_wheel.sh abi3")
-                                stash includes: 'dist/*.whl', name: 'python abi3 wheel'
+                if(params.INCLUDE_MACOS == true){
+                    node('mac && python3 && arm64'){
+                        checkout scm
+                        timeout(60){
+                            try{
+                                withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                    sh(label: 'Building Python ABI3 wheel', script: "scripts/build_mac_wheel.sh abi3")
+                                    stash includes: 'dist/*.whl', name: 'python abi3 wheel'
+                                }
+                            } finally {
+                                sh "${tool(name: 'Default', type: 'git')} clean -dffx"
                             }
-                        } finally {
-                            sh "${tool(name: 'Default', type: 'git')} clean -dffx"
                         }
                     }
+                } else {
+                    Utils.markStageSkippedForConditional('Building Python ABI3 wheel')
                 }
             }
             stage('Testing Python ABI3 wheel') {
-                if(testPackages != true){
+                if(testPackages != true || params.INCLUDE_MACOS != true){
                     Utils.markStageSkippedForConditional('Testing Python ABI3 wheel')
                 }
                 parallel([:] << allValidArches.collectEntries{arch ->
@@ -361,7 +384,7 @@ def get_mac_abi3_wheel_stages(pythonVersionsTotestAbi3Wheels, testPackages, para
                     pythonVersionsTotestAbi3Wheels.each{pythonVersion ->
                         def newWheelStage = "Testing ABI3 wheel on MacOS - Python ${pythonVersion} - ${arch}"
                         testingStages[newWheelStage] = {
-                            if(testPackages == true && selectedArches.contains(arch)){
+                            if(testPackages == true && selectedArches.contains(arch) && params.INCLUDE_MACOS == true){
                                 node("mac && python${pythonVersion} && ${arch}"){
                                     checkout scm
                                     try{
@@ -1061,6 +1084,9 @@ pipeline {
                     }
                     steps{
                         script{
+                            if(params.INCLUDE_MACOS != true){
+                                Utils.markStageSkippedForConditional('Platform Wheels: Mac')
+                            }
                             parallel(
                                 [failFast: true] +
                                 get_mac_nonabi3_wheel_stages(SUPPORTED_MAC_VERSIONS_NONABI3, params.TEST_PACKAGES, params, wheelStashes, retryTimes) +
