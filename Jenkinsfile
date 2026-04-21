@@ -120,14 +120,20 @@ def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelS
                                                                 docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp')
                                                                 {
                                                                     withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}", "TOX_UV_PATH=${WORKSPACE}/venv/bin/uv"]){
-                                                                        sh(
-                                                                            label: 'Testing with tox',
-                                                                            script: """python3 -m venv venv
-                                                                                       ./venv/bin/pip install --disable-pip-version-check uv
-                                                                                       trap "rm -rf venv" EXIT
-                                                                                       ./venv/bin/uv run --only-group=tox tox -e py${pythonVersion.replace('.', '')} --installpkg ${findFiles(glob:'dist/*.whl')[0].path} -vv
-                                                                                    """
-                                                                        )
+                                                                        def attempt = 0
+                                                                        retry(2){
+                                                                            attempt += 1
+                                                                            withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                                sh(
+                                                                                    label: "Testing with tox ${(attempt == 1) ? "Offline" : 'Online'}",
+                                                                                    script: """python3 -m venv venv
+                                                                                               ./venv/bin/pip install --disable-pip-version-check uv
+                                                                                               trap "rm -rf venv" EXIT
+                                                                                               ./venv/bin/uv run --only-group=tox tox -e py${pythonVersion.replace('.', '')} --installpkg ${findFiles(glob:'dist/*.whl')[0].path} -vv
+                                                                                            """
+                                                                                )
+                                                                            }
+                                                                        }
                                                                     }
                                                                 }
                                                             } finally {
@@ -216,12 +222,18 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                         docker.image('python').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec') {
                                                             unstash "python abi3 linux - ${arch} - wheel"
                                                             findFiles(glob: 'dist/*manylinux*.*whl').each{
-                                                                timeout(60){
-                                                                    sh(label: 'Running Tox',
-                                                                       script: """python3 -m venv venv
-                                                                       ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                       ./venv/bin/uv run --only-group=tox tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
-                                                                    )
+                                                                def attempt = 0
+                                                                retry(2){
+                                                                    attempt += 1
+                                                                    withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                        timeout(60){
+                                                                            sh(label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
+                                                                               script: """python3 -m venv venv
+                                                                               ./venv/bin/python -m pip install --disable-pip-version-check uv
+                                                                               ./venv/bin/uv run --only-group=tox tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                            )
+                                                                        }
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -477,15 +489,28 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                         ]){
                                             checkout scm
                                             try{
-                                                docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside("--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython --mount source=msvc-runtime,target=c:\\msvc_runtime --mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
+                                                docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside(
+                                                    "--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython " +
+                                                    "--mount source=msvc-runtime,target=c:\\msvc_runtime " +
+                                                    "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR} " +
+                                                    "--mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"
+                                                ){
                                                     retry(retryTimes){
                                                         try{
                                                             withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
+                                                                bat "python -m pip install --disable-pip-version-check uv"
                                                                 unstash "python${pythonVersion} windows wheel"
                                                                 findFiles(glob: 'dist/*.whl').each{
-                                                                    bat """python -m pip install --disable-pip-version-check uv
-                                                                           uv run --only-group=tox -p ${pythonVersion} tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
-                                                                        """
+                                                                    def attempt = 0
+                                                                    retry(2){
+                                                                        attempt += 1
+                                                                        withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                            bat(
+                                                                                label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
+                                                                                script: "uv run --only-group=tox -p ${pythonVersion} tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}"
+                                                                            )
+                                                                        }
+                                                                    }
                                                                 }
                                                             }
                                                         } catch (e){
@@ -584,15 +609,27 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
                                         ]){
                                             checkout scm
                                             try{
-                                                docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside("--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython --mount source=msvc-runtime,target=c:\\msvc_runtime --mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
+                                                docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside(
+                                                    "--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython " +
+                                                    "--mount source=msvc-runtime,target=c:\\msvc_runtime " +
+                                                    "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR} " +
+                                                    "--mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
                                                     retry(retryTimes){
                                                         try{
                                                             withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
                                                                 unstash 'python abi3 windows wheel'
+                                                                bat 'python -m pip install --disable-pip-version-check uv'
                                                                 findFiles(glob: 'dist/*.whl').each{
-                                                                    bat """python -m pip install --disable-pip-version-check uv
-                                                                           uv run --python ${pythonVersion}+gil --only-group=tox tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}
-                                                                        """
+                                                                    def attempt = 0
+                                                                    retry(2){
+                                                                        attempt += 1
+                                                                        withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                            bat(
+                                                                                label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
+                                                                                script: "uv run --python ${pythonVersion}+gil --only-group=tox tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}"
+                                                                            )
+                                                                        }
+                                                                    }
                                                                 }
                                                             }
                                                         } catch (e){
@@ -1173,20 +1210,28 @@ pipeline {
                                                 "${newStageName}": {
                                                     if(selectedArches.contains(arch)){
                                                         stage("Test sdist (MacOS ${arch} - Python ${pythonVersion})"){
-                                                            node("mac && python${pythonVersion} && ${arch}"){
+                                                            node("mac && python3 && ${arch}"){
                                                                 checkout scm
                                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                                                    sh """python3 -m venv venv
+                                                                          venv/bin/pip install --disable-pip-version-check uv
+                                                                          venv/bin/uv python install ${pythonVersion}
+                                                                       """
                                                                     unstash 'python sdist'
                                                                     try{
                                                                         findFiles(glob: 'dist/*.tar.gz').each{
-                                                                            sh(label: 'Running Tox',
-                                                                               script: """python${pythonVersion} -m venv venv
-                                                                                          venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                                          venv/bin/uv run --only-group=tox tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
-                                                                                          rm -rf ./.tox
-                                                                                          rm -rf ./venv
-                                                                                       """
-                                                                            )
+                                                                            def attempt = 0
+                                                                            retry(2){
+                                                                                attempt += 1
+                                                                                withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                                    sh(label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
+                                                                                       script: """venv/bin/uv run --only-group=tox tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
+                                                                                                  rm -rf ./.tox
+                                                                                                  rm -rf ./venv
+                                                                                               """
+                                                                                    )
+                                                                                }
+                                                                            }
                                                                         }
                                                                     } finally {
                                                                         sh "${tool(name: 'Default', type: 'git')} clean -dfx"
@@ -1238,10 +1283,16 @@ pipeline {
                                                                                     unstash 'python sdist'
                                                                                     bat "uv python install cpython-${pythonVersion}"
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
-                                                                                        powershell(
-                                                                                            label: 'Running Tox',
-                                                                                            script: "uv run --python ${pythonVersion}+gil --only-group=tox tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
-                                                                                        )
+                                                                                        def attempt = 0
+                                                                                        retry(2){
+                                                                                            attempt += 1
+                                                                                            withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                                                powershell(
+                                                                                                    label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
+                                                                                                    script: "uv run --python ${pythonVersion}+gil --only-group=tox tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
+                                                                                                )
+                                                                                            }
+                                                                                        }
                                                                                     }
                                                                                 }
                                                                             }
@@ -1302,14 +1353,20 @@ pipeline {
                                                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
                                                                                     unstash 'python sdist'
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
-                                                                                        sh(
-                                                                                            label: 'Running Tox',
-                                                                                            script: """python3 -m venv venv
-                                                                                                       trap "rm -rf venv" EXIT
-                                                                                                       venv/bin/pip install --disable-pip-version-check uv
-                                                                                                       trap "rm -rf venv && rm -rf .tox" EXIT
-                                                                                                       venv/bin/uv run --python-preference system --only-group=tox tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')} -vv"""
-                                                                                            )
+                                                                                        def attempt = 0
+                                                                                        retry(2){
+                                                                                            attempt += 1
+                                                                                            withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                                                sh(
+                                                                                                    label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
+                                                                                                    script: """python3 -m venv venv
+                                                                                                               trap "rm -rf venv" EXIT
+                                                                                                               venv/bin/pip install --disable-pip-version-check uv
+                                                                                                               trap "rm -rf venv && rm -rf .tox" EXIT
+                                                                                                               venv/bin/uv run --python-preference system --only-group=tox tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                                                    )
+                                                                                            }
+                                                                                        }
                                                                                     }
                                                                                 }
                                                                             }
