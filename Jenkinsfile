@@ -82,7 +82,7 @@ def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelS
                                         withEnv([
                                             'PIP_CACHE_DIR=/tmp/pipcache',
                                             'UV_TOOL_DIR=/tmp/uvtools',
-                                            'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
+                                            'UV_PYTHON_CACHE_DIR=/tmp/uvpython',
                                             'UV_CACHE_DIR=/tmp/uvcache',
                                         ]){
                                             stage("Build Wheel (${pythonVersion} Linux ${arch})"){
@@ -117,9 +117,10 @@ def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelS
                                                             checkout scm
                                                             unstash "python${pythonVersion} linux - ${arch} - wheel"
                                                             try{
-                                                                docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp")
+                                                                docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share:exec --tmpfs /.local/bin:exec")
                                                                 {
                                                                     withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}"]){
+                                                                        sh "uv python install ${pythonVersion}"
                                                                         def attempt = 0
                                                                         retry(2){
                                                                             attempt += 1
@@ -211,10 +212,11 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                     withEnv([
                                                         'PIP_CACHE_DIR=/tmp/pipcache',
                                                         'UV_TOOL_DIR=/tmp/uvtools',
-                                                        'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
+                                                        'UV_PYTHON_CACHE_DIR=/tmp/uvpython',
                                                         'UV_CACHE_DIR=/tmp/uvcache',
                                                     ]){
-                                                        docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec") {
+                                                        docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec --tmpfs /.local/share:exec --tmpfs /.local/bin:exec") {
+                                                            sh "uv python install ${pythonVersion}"
                                                             unstash "python abi3 linux - ${arch} - wheel"
                                                             findFiles(glob: 'dist/*manylinux*.*whl').each{
                                                                 def attempt = 0
@@ -481,7 +483,7 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                         withEnv([
                                             'PIP_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\pipcache',
                                             'UV_TOOL_DIR=C:\\Users\\ContainerUser\\Documents\\uvtools',
-                                            'UV_PYTHON_INSTALL_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
+                                            'UV_PYTHON_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
                                             'UV_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvcache',
                                         ]){
                                             checkout scm
@@ -491,7 +493,7 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                                     "--label \"absoluteUrl=${currentBuild.absoluteUrl}\" " +
                                                     "--label \"JOB_NAME=${env.JOB_NAME}\" " +
                                                     "--label \"BUILD_NUMBER=${currentBuild.number}\" " +
-                                                    "--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython " +
+                                                    "--mount source=uv_python_cache_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython " +
                                                     "--mount source=msvc-runtime,target=c:\\msvc_runtime " +
                                                     "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR} " +
                                                     "--mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"
@@ -500,6 +502,7 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                                         try{
                                                             withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
                                                                 bat "python -m pip install --disable-pip-version-check uv"
+                                                                bat "uv python install ${pythonVersion}"
                                                                 unstash "python${pythonVersion} windows wheel"
                                                                 findFiles(glob: 'dist/*.whl').each{
                                                                     def attempt = 0
@@ -605,7 +608,7 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
                                         withEnv([
                                             'PIP_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\pipcache',
                                             'UV_TOOL_DIR=C:\\Users\\ContainerUser\\Documents\\uvtools',
-                                            'UV_PYTHON_INSTALL_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
+                                            'UV_PYTHON_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
                                             'UV_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvcache',
                                         ]){
                                             checkout scm
@@ -615,7 +618,7 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
                                                     "--label \"absoluteUrl=${currentBuild.absoluteUrl}\" " +
                                                     "--label \"JOB_NAME=${env.JOB_NAME}\" " +
                                                     "--label \"BUILD_NUMBER=${currentBuild.number}\" " +
-                                                    "--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython " +
+                                                    "--mount source=uv_python_cache_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython " +
                                                     "--mount source=msvc-runtime,target=c:\\msvc_runtime " +
                                                     "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR} " +
                                                     "--mount source=${sharedPipCacheVolumeName},target=${env:PIP_CACHE_DIR}"){
@@ -624,6 +627,7 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
                                                             withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
                                                                 unstash 'python abi3 windows wheel'
                                                                 bat 'python -m pip install --disable-pip-version-check uv'
+                                                                bat "uv python install ${pythonVersion}"
                                                                 findFiles(glob: 'dist/*.whl').each{
                                                                     def attempt = 0
                                                                     retry(2){
@@ -707,7 +711,7 @@ pipeline {
                     environment{
                         PIP_CACHE_DIR='/tmp/pipcache'
                         UV_TOOL_DIR='/tmp/uvtools'
-                        UV_PYTHON_INSTALL_DIR='/tmp/uvpython'
+                        UV_PYTHON_CACHE_DIR='/tmp/uvpython'
                         UV_CACHE_DIR='/tmp/uvcache'
                         UV_CONFIG_FILE="${createUnixUvConfig()}"
                     }
@@ -916,7 +920,7 @@ pipeline {
                             environment{
                                 PIP_CACHE_DIR='/tmp/pipcache'
                                 UV_TOOL_DIR='/tmp/uvtools'
-                                UV_PYTHON_INSTALL_DIR='/tmp/uvpython'
+                                UV_PYTHON_CACHE_DIR='/tmp/uvpython'
                                 UV_CACHE_DIR='/tmp/uvcache'
                             }
                             when{
@@ -957,7 +961,7 @@ pipeline {
                                                         }
                                                         try{
                                                             try{
-                                                                image.inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share/uv/credentials --tmpfs /cache:exec -e TOX_WORK_DIR=/cache/tox -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment") {
+                                                                image.inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /cache:exec --tmpfs /.local/share:exec --tmpfs /.local/bin:exec -e TOX_WORK_DIR=/cache/tox -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment") {
                                                                     withEnv([
                                                                         "UV_CONFIG_FILE=${createUnixUvConfig()}",
                                                                         "UV_LOCK_TIMEOUT=600"
@@ -1360,11 +1364,12 @@ pipeline {
                                                                         withEnv([
                                                                             'PIP_CACHE_DIR=/tmp/pipcache',
                                                                             'UV_TOOL_DIR=/tmp/uvtools',
-                                                                            'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
+                                                                            'UV_PYTHON_CACHE_DIR=/tmp/uvpython',
                                                                             'UV_CACHE_DIR=/tmp/uvcache',
                                                                         ]){
-                                                                            dockerImage.inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp"){
+                                                                            dockerImage.inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share:exec --tmpfs /.local/bin:exec"){
                                                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                                                                    sh "uv python install ${pythonVersion}"
                                                                                     unstash 'python sdist'
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
                                                                                         def attempt = 0
@@ -1416,7 +1421,7 @@ pipeline {
                     environment{
                         PIP_CACHE_DIR='/tmp/pipcache'
                         UV_TOOL_DIR='/tmp/uvtools'
-                        UV_PYTHON_INSTALL_DIR='/tmp/uvpython'
+                        UV_PYTHON_CACHE_DIR='/tmp/uvpython'
                         UV_CACHE_DIR='/tmp/uvcache'
                     }
                     agent {
