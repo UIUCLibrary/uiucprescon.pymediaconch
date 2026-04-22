@@ -6,7 +6,7 @@ backend-path = ["build_backend"]
 [project]
 name = "uiucprescon.pymediaconch"
 version = "0.1.2.dev0"
-requires-python = '>=3.9'
+requires-python = '>=3.10'
 license = "NCSA"
 license-files = ["LICENSE"]
 description = "Python wrapper around mediaconch"
