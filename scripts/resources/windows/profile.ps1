@@ -40,7 +40,7 @@ function Build-Wheel {
             [string]$OutputDirectory,
             [string]$SourceDirectory
         )
-        uv run --frozen --only-group=build --project=$SourceDirectory --isolated delvewheel repair $WheelFile --namespace-pkg uiucprescon.pymediaconch --no-mangle-all --wheel-dir $OutputDirectory
+        uv run --frozen --only-group=fix-up-wheel --project=$SourceDirectory --isolated delvewheel repair $WheelFile --namespace-pkg uiucprescon.pymediaconch --no-mangle-all --wheel-dir $OutputDirectory
     }
 
     function Verify-PackageWithTwine{
