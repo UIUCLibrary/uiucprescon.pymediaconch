@@ -108,3 +108,6 @@ ARG CONAN_HOME
 COPY --from=conan_builder ${CONAN_HOME}/ ${CONAN_HOME}/
 ENV CONAN_USER_HOME=${CONAN_USER_HOME}
 COPY scripts/resources/windows/profile.ps1 C:/Windows/System32/WindowsPowerShell/v1.0/profile.ps1
+
+# To help mark the image as a CI image so it can be cleaned up more easily
+LABEL purpose=ci

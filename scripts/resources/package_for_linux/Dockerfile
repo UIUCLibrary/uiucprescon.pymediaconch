@@ -102,3 +102,6 @@ COPY --chmod=755 scripts/resources/package_for_linux/build-wheel.sh /usr/bin/bui
 
 
 CMD ["build-wheel", "--help"]
+
+# To help mark the image as a CI image so it can be cleaned up more easily
+LABEL purpose=ci

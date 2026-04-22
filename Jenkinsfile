@@ -117,7 +117,7 @@ def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelS
                                                             checkout scm
                                                             unstash "python${pythonVersion} linux - ${arch} - wheel"
                                                             try{
-                                                                docker.image('ghcr.io/astral-sh/uv:debian').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp')
+                                                                docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp")
                                                                 {
                                                                     withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}"]){
                                                                         def attempt = 0
@@ -214,7 +214,7 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                         'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
                                                         'UV_CACHE_DIR=/tmp/uvcache',
                                                     ]){
-                                                        docker.image('ghcr.io/astral-sh/uv:debian').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec') {
+                                                        docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec") {
                                                             unstash "python abi3 linux - ${arch} - wheel"
                                                             findFiles(glob: 'dist/*manylinux*.*whl').each{
                                                                 def attempt = 0
@@ -483,6 +483,10 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                             checkout scm
                                             try{
                                                 docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside(
+                                                    "--label=purpose=ci " +
+                                                    "--label \"absoluteUrl=${currentBuild.absoluteUrl}\" " +
+                                                    "--label \"JOB_NAME=${env.JOB_NAME}\" " +
+                                                    "--label \"BUILD_NUMBER=${currentBuild.number}\" " +
                                                     "--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython " +
                                                     "--mount source=msvc-runtime,target=c:\\msvc_runtime " +
                                                     "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR} " +
@@ -603,6 +607,10 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
                                             checkout scm
                                             try{
                                                 docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside(
+                                                    "--label=purpose=ci " +
+                                                    "--label \"absoluteUrl=${currentBuild.absoluteUrl}\" " +
+                                                    "--label \"JOB_NAME=${env.JOB_NAME}\" " +
+                                                    "--label \"BUILD_NUMBER=${currentBuild.number}\" " +
                                                     "--mount source=uv_python_install_dir,target=C:\\Users\\ContainerUser\\Documents\\uvpython " +
                                                     "--mount source=msvc-runtime,target=c:\\msvc_runtime " +
                                                     "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR} " +
@@ -688,8 +696,8 @@ pipeline {
                         dockerfile {
                             filename 'ci/docker/linux/jenkins/Dockerfile'
                             label 'linux && docker && x86'
-                            args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment --tmpfs /cache:exec'
-                            additionalBuildArgs '--build-arg CONAN_CENTER_PROXY_V2_URL'
+                            args "--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment --tmpfs /cache:exec"
+                            additionalBuildArgs '--build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci'
                         }
                     }
                     environment{
@@ -916,7 +924,7 @@ pipeline {
                                     node('docker && linux'){
                                         try{
                                             checkout scm
-                                            docker.image('ghcr.io/astral-sh/uv:debian').inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/bin:exec --tmpfs /tox_workdir:exec -e TOX_WORK_DIR=/tox_workdir/.tox -e UV_PROJECT_ENVIRONMENT=/tox_workdir/.venv'){
+                                            docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/bin:exec --tmpfs /tox_workdir:exec -e TOX_WORK_DIR=/tox_workdir/.tox -e UV_PROJECT_ENVIRONMENT=/tox_workdir/.venv"){
                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
                                                     envs = sh(
                                                         label: 'Get tox environments',
@@ -940,12 +948,12 @@ pipeline {
                                                         def image
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
                                                             retry(retryTimes){
-                                                                image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL .')
+                                                                image = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci .')
                                                             }
                                                         }
                                                         try{
                                                             try{
-                                                                image.inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share/uv/credentials --tmpfs /cache:exec -e TOX_WORK_DIR=/cache/tox -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment') {
+                                                                image.inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share/uv/credentials --tmpfs /cache:exec -e TOX_WORK_DIR=/cache/tox -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment") {
                                                                     withEnv([
                                                                         "UV_CONFIG_FILE=${createUnixUvConfig()}",
                                                                         "UV_LOCK_TIMEOUT=600"
@@ -1001,7 +1009,11 @@ pipeline {
                                          checkout scm
                                          try{
                                             docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python')
-                                                .inside("--mount type=volume,source=uv_python_cache_dir,target=${env.UV_PYTHON_CACHE_DIR} " +
+                                                .inside('--label=purpose=ci ' +
+                                                        "--label \"absoluteUrl=${currentBuild.absoluteUrl}\" " +
+                                                        "--label \"JOB_NAME=${env.JOB_NAME}\" " +
+                                                        "--label \"BUILD_NUMBER=${currentBuild.number}\" " +
+                                                        "--mount type=volume,source=uv_python_cache_dir,target=${env.UV_PYTHON_CACHE_DIR} " +
                                                         "--mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} " +
                                                         "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                 ){
@@ -1029,12 +1041,16 @@ pipeline {
                                                         checkout scm
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
                                                             retry(retryTimes){
-                                                                image = docker.build(UUID.randomUUID().toString(), '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
+                                                                image = docker.build(UUID.randomUUID().toString(), '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE --label=purpose=ci' +  (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
                                                             }
                                                         }
                                                         try{
                                                             try{
-                                                                image.inside("--mount type=volume,source=uv_python_cache_dir,target=${env.UV_PYTHON_CACHE_DIR} " +
+                                                                image.inside("--label=purpose=ci " +
+                                                                             "--label \"absoluteUrl=${currentBuild.absoluteUrl}\" " +
+                                                                             "--label \"JOB_NAME=${env.JOB_NAME}\" " +
+                                                                             "--label \"BUILD_NUMBER=${currentBuild.number}\" " +
+                                                                             "--mount type=volume,source=uv_python_cache_dir,target=${env.UV_PYTHON_CACHE_DIR} " +
                                                                              "--mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} " +
                                                                              "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                                 ){
@@ -1147,7 +1163,7 @@ pipeline {
                                 docker{
                                     image 'ghcr.io/astral-sh/uv:debian'
                                     label 'linux && docker'
-                                    args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'
+                                    args "--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp"
                                   }
                             }
                             environment{
@@ -1256,7 +1272,7 @@ pipeline {
                                                                             checkout scm
                                                                             lock("docker build-${env.NODE_NAME}"){
                                                                                 def dockerImageName = "${currentBuild.fullProjectName}_${UUID.randomUUID().toString()}".replaceAll("-", "_").replaceAll('/', "_").replaceAll(' ', "").toLowerCase()
-                                                                                dockerImage = docker.build(dockerImageName, '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
+                                                                                dockerImage = docker.build(dockerImageName, '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE --label=purpose=ci' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
                                                                             }
                                                                             withEnv([
                                                                                 'UV_PYTHON_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
@@ -1266,6 +1282,10 @@ pipeline {
                                                                                 "UV_CONFIG_FILE=${createWindowUVConfig()}"
                                                                             ]){
                                                                                 dockerImage.inside(
+                                                                                    '--label=purpose=ci ' +
+                                                                                    "--label \"absoluteUrl=${currentBuild.absoluteUrl}\" " +
+                                                                                    "--label \"JOB_NAME=${env.JOB_NAME}\" "+
+                                                                                    "--label \"BUILD_NUMBER=${currentBuild.number}\" " +
                                                                                     '--mount type=volume,source=uv_python_cache_dir,target=$UV_PYTHON_CACHE_DIR ' +
                                                                                     '--mount type=volume,source=pipcache,target=$PIP_CACHE_DIR ' +
                                                                                     '--mount type=volume,source=uv_cache_dir,target=$UV_CACHE_DIR'
@@ -1331,7 +1351,7 @@ pipeline {
                                                                     try{
                                                                         checkout scm
                                                                         lock("docker build-${env.NODE_NAME}"){
-                                                                            dockerImage = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL .')
+                                                                            dockerImage = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci .')
                                                                         }
                                                                         withEnv([
                                                                             'PIP_CACHE_DIR=/tmp/pipcache',
@@ -1339,7 +1359,7 @@ pipeline {
                                                                             'UV_PYTHON_INSTALL_DIR=/tmp/uvpython',
                                                                             'UV_CACHE_DIR=/tmp/uvcache',
                                                                         ]){
-                                                                            dockerImage.inside('--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'){
+                                                                            dockerImage.inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp"){
                                                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
                                                                                     unstash 'python sdist'
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
@@ -1399,7 +1419,7 @@ pipeline {
                         docker{
                             image 'python'
                             label 'docker && linux'
-                            args '--mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp'
+                            args "--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp"
                         }
                     }
                     when{

@@ -22,6 +22,7 @@ function Build-DockerImage {
         "--build-arg UV_INDEX_URL",
         "--build-arg CONAN_CENTER_PROXY_V2_URL",
         "--build-arg UV_CACHE_DIR=c:/users/containeradministrator/appdata/local/uv",
+        "--label=purpose=build-wheel",
         "-t", $ImageName,
         "."
     )
@@ -65,6 +66,7 @@ function Build-Wheel {
 
     $dockerArgsList = @(
         "run",
+        "--label=purpose=build-wheel",
         "--isolation", $DockerIsolation,
         "--platform windows/amd64",
         "--rm",

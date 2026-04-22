@@ -67,3 +67,6 @@ ARG CONAN_HOME
 COPY --from=conan_builder --chmod=777 ${CONAN_HOME}/ ${CONAN_HOME}/
 ENV CONAN_USER_HOME=${CONAN_USER_HOME} \
     CONAN_HOME=${CONAN_HOME}
+
+# To help mark the image as a CI image so it can be cleaned up more easily
+LABEL purpose=ci
