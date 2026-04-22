@@ -22,6 +22,7 @@ function Build-DockerImage {
         "--build-arg UV_INDEX_URL",
         "--build-arg CONAN_CENTER_PROXY_V2_URL",
         "--build-arg UV_CACHE_DIR=c:/users/containeradministrator/appdata/local/uv",
+        "--label=purpose=build-wheel",
         "-t", $ImageName,
         "."
     )
@@ -54,7 +55,8 @@ function Build-Wheel {
     $venv = "${containerCacheDir}\venv"
 
     $UV_TOOL_DIR = "${containerCacheDir}\uvtools"
-    $UV_PYTHON_INSTALL_DIR = "${containerCacheDir}\uvpython"
+    $UV_PYTHON_CACHE_DIR = "${containerCacheDir}\uvpython"
+    $UV_CACHE_DIR="C:\Users\ContainerUser\Documents\cache\uvcache"
 
     # This makes a symlink copy of the files mounted in the source. Any changes to the files will not affect outside the container
     $createShallowCopy = "foreach (`$item in `$(Get-ChildItem -Path $containerSourcePath)) { `
@@ -65,15 +67,19 @@ function Build-Wheel {
 
     $dockerArgsList = @(
         "run",
+        "--label=purpose=build-wheel",
         "--isolation", $DockerIsolation,
         "--platform windows/amd64",
         "--rm",
         "--workdir=${containerWorkingPath}",
-        "--mount type=volume,source=uvcache,target=C:\Users\ContainerUser\Documents\cache\uvpython",
+        "--mount type=volume,source=uv_python_cache_dir,target=${UV_PYTHON_CACHE_DIR}",
+        "--mount type=volume,source=uvcache,target=${UV_CACHE_DIR}",
         "--mount type=volume,source=${ContainerName}Cache,target=${containerCacheDir}",
         "--mount type=bind,source=$(Resolve-Path $projectRootDirectory),target=${containerSourcePath}",
         "--mount type=bind,source=$(Resolve-Path $outputDirectory),target=${containerDistPath}",
         "-e UV_TOOL_DIR=${UV_TOOL_DIR}",
+        "-e UV_PYTHON_CACHE_DIR=${UV_PYTHON_CACHE_DIR}",
+        "-e UV_CACHE_DIR=${UV_CACHE_DIR}",
         '--entrypoint', 'powershell',
         $DockerImageName
         "Build-Wheel ${containerSourcePath} ${containerDistPath} ${PythonVersion}"

@@ -38,6 +38,7 @@ generate_wheel(){
         --build-arg PIP_INDEX_URL \
         --build-arg UV_EXTRA_INDEX_URL \
         --build-arg UV_INDEX_URL \
+        --label=purpose=build-wheel \
         "$PROJECT_ROOT"
     mkdir -p "$output_path"
     docker run --rm \
@@ -45,6 +46,7 @@ generate_wheel(){
         --interactive \
         -v "$PROJECT_ROOT":/project:ro \
         --mount type=bind,src="$(realpath "$output_path")",dst=/dist \
+        --label=purpose=build-wheel \
         "$docker_image_name_to_use" \
         build-wheel /project /dist "${python_versions_to_use[@]}"
 }

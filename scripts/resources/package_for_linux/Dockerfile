@@ -73,7 +73,7 @@ RUN --mount=type=cache,target=${PIP_CACHE_DIR} \
         fi && \
     uv run --only-group=build conan install /tmp --build missing && \
     uv run --only-group=build conan cache clean "*" -b --source --build --temp && \
-    if [ "$(jq -r '.remotes[0].url' ${CONAN_HOME}/remotes.json )" != "${CONAN_CENTER_PROXY_V2_URL}" ]; then \
+    if [ -f /tmp/remotes.json ]; then \
         mv -f /tmp/remotes.json ${CONAN_HOME}/remotes.json; \
     fi && \
     mv -f /tmp/global.conf.original ${CONAN_HOME}/global.conf
@@ -102,3 +102,6 @@ COPY --chmod=755 scripts/resources/package_for_linux/build-wheel.sh /usr/bin/bui
 
 
 CMD ["build-wheel", "--help"]
+
+# To help mark the image as a CI image so it can be cleaned up more easily
+LABEL purpose=ci

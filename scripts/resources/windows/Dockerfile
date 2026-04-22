@@ -93,7 +93,7 @@ RUN uv run --only-group=build conan profile detect --exist-ok ; `
     } ;`
     uv run --only-group=build conan cache clean "*" -b --source --build --temp ; `
     uv cache clean --no-progress ; `
-    if (${env:CONAN_CENTER_PROXY_V2_URL} -ne $(Get-Content -Raw -Path ${Env:CONAN_HOME}\remotes.json)) { `
+    if (Test-Path -Path "c:\remotes.json") { `
       Move-Item -Path "c:\remotes.json" -Destination "${Env:CONAN_HOME}\remotes.json" -Force ;`
     }
 
@@ -108,3 +108,6 @@ ARG CONAN_HOME
 COPY --from=conan_builder ${CONAN_HOME}/ ${CONAN_HOME}/
 ENV CONAN_USER_HOME=${CONAN_USER_HOME}
 COPY scripts/resources/windows/profile.ps1 C:/Windows/System32/WindowsPowerShell/v1.0/profile.ps1
+
+# To help mark the image as a CI image so it can be cleaned up more easily
+LABEL purpose=ci

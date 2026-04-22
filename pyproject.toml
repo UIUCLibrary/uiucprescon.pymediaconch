@@ -6,7 +6,7 @@ backend-path = ["build_backend"]
 [project]
 name = "uiucprescon.pymediaconch"
 version = "0.1.2.dev0"
-requires-python = '>=3.9'
+requires-python = '>=3.10'
 license = "NCSA"
 license-files = ["LICENSE"]
 description = "Python wrapper around mediaconch"
@@ -19,15 +19,22 @@ authors = [
 readme = {file = "README.md", content-type = "text/markdown"}
 
 [dependency-groups]
+audit-dependencies = ['uv-secure']
 test = ["coverage", "pytest"]
-tox = ["tox", 'tox-uv-bare;python_version>="3.10"']
-build = ["nanobind", "cmake<4.0", "conan>2.0", "setuptools", "delvewheel;os_name == 'nt'"]
+tox = ["tox"]
+tox-uv = [
+    {include-group = "tox"},
+    "tox-uv-bare"
+]
+build = ["nanobind", "cmake<4.0", "conan>2.0", "setuptools", {include-group = "fix-up-wheel"}]
+fix-up-wheel = ["delvewheel;os_name == 'nt'"]
 docs = [
     {include-group = "build"},
     "sphinx",
     'tomli;python_version<"3.11"',
 ]
 dev = [
+    {include-group = "audit-dependencies"},
     {include-group = "docs"},
     {include-group = "test"},
     {include-group = "tox"},
