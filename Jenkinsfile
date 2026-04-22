@@ -786,7 +786,7 @@ pipeline {
                                 stage('Clang Tidy'){
                                     steps{
                                         sh 'mkdir -p logs'
-                                        catchError(buildResult: 'SUCCESS', message: 'clang-tidy found some issues', stageResult: 'UNSTABLE') {
+                                        catchError(message: 'clang-tidy found some issues', stageResult: 'UNSTABLE') {
                                             sh 'clang-tidy src/uiucprescon/pymediaconch/pymediaconch.cpp -- $(uv run -m nanobind --include_dir) -Ibuild/temp/include | tee logs/clang-tidy.log'
                                         }
                                     }
@@ -816,7 +816,7 @@ pipeline {
                                 }
                                 stage('Documentation linkcheck'){
                                     steps {
-                                        catchError(buildResult: 'SUCCESS', message: 'Sphinx docs linkcheck', stageResult: 'UNSTABLE') {
+                                        catchError(message: 'Sphinx docs linkcheck', stageResult: 'UNSTABLE') {
                                             sh(
                                                 label: 'Running Sphinx docs linkcheck',
                                                 script: 'uv run -m sphinx -b doctest docs/source build/docs -d build/docs/doctrees --no-color --builder=linkcheck --fail-on-warning -w logs/linkcheck.log'
@@ -849,9 +849,10 @@ pipeline {
                                     steps{
                                         catchError(
                                             buildResult: 'UNSTABLE',
+                                            stageResult: 'UNSTABLE',
                                             message: 'uv-secure found issues. uv.lock might need to updated'
                                         ) {
-                                            sh 'uvx uv-secure --disable-cache uv.lock'
+                                            sh 'uv run uv-secure --disable-cache uv.lock'
                                         }
                                     }
                                 }
@@ -860,7 +861,7 @@ pipeline {
                                         MYPYPATH='build/lib'
                                     }
                                     steps{
-                                        catchError(buildResult: 'SUCCESS', message: 'MyPy found issues', stageResult: 'UNSTABLE') {
+                                        catchError(message: 'MyPy found issues', stageResult: 'UNSTABLE') {
                                             sh(
                                                 label: 'Running Mypy',
                                                 script: 'uv run mypy -p uiucprescon.pymediaconch --html-report reports/mypy/html > logs/mypy.log'

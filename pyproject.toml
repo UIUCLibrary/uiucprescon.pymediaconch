@@ -19,6 +19,7 @@ authors = [
 readme = {file = "README.md", content-type = "text/markdown"}
 
 [dependency-groups]
+audit-dependencies = ['uv-secure']
 test = ["coverage", "pytest"]
 tox = ["tox", 'tox-uv-bare;python_version>="3.10"']
 build = ["nanobind", "cmake<4.0", "conan>2.0", "setuptools", "delvewheel;os_name == 'nt'"]
@@ -28,6 +29,7 @@ docs = [
     'tomli;python_version<"3.11"',
 ]
 dev = [
+    {include-group = "audit-dependencies"},
     {include-group = "docs"},
     {include-group = "test"},
     {include-group = "tox"},
