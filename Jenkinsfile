@@ -127,7 +127,7 @@ def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelS
                                                                             withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                                 sh(
                                                                                     label: "Testing with tox ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                                    script: "uv run --only-group=tox-uv tox -e py${pythonVersion.replace('.', '')} --installpkg ${findFiles(glob:'dist/*.whl')[0].path} -vv"
+                                                                                    script: "uv run --frozen --only-group=tox-uv tox -e py${pythonVersion.replace('.', '')} --installpkg ${findFiles(glob:'dist/*.whl')[0].path} -vv"
                                                                                 )
                                                                             }
                                                                         }
@@ -225,7 +225,7 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                                     withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                         timeout(60){
                                                                             sh(label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                               script: "uv run --only-group=tox-uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
+                                                                               script: "uv run --frozen --only-group=tox-uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
                                                                             )
                                                                         }
                                                                     }
@@ -321,7 +321,7 @@ def get_mac_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params, wh
                                                                                             sh(label: 'Running Tox',
                                                                                                script: """python${pythonVersion} -m venv venv
                                                                                                ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                                                               ./venv/bin/uv run --only-group=tox-uv tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                                                               ./venv/bin/uv run --frozen --only-group=tox-uv tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
                                                                                             )
                                                                                         }
                                                                                     }
@@ -404,7 +404,7 @@ def get_mac_abi3_wheel_stages(pythonVersionsTotestAbi3Wheels, testPackages, para
                                                     sh(label: 'Running Tox',
                                                        script: """python${pythonVersion} -m venv venv
                                                        ./venv/bin/python -m pip install --disable-pip-version-check uv
-                                                       ./venv/bin/uv run --only-group=tox-uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
+                                                       ./venv/bin/uv run --frozen --only-group=tox-uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"""
                                                     )
                                                 }
                                             }
@@ -511,7 +511,7 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                                                         withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                             bat(
                                                                                 label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                                script: "uv run --only-group=tox-uv -p ${pythonVersion} tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}"
+                                                                                script: "uv run --frozen --only-group=tox-uv -p ${pythonVersion} tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}"
                                                                             )
                                                                         }
                                                                     }
@@ -635,7 +635,7 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
                                                                         withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                             bat(
                                                                                 label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                                script: "uv run --python ${pythonVersion}+gil --only-group=tox-uv tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}"
+                                                                                script: "uv run --frozen --python ${pythonVersion}+gil --only-group=tox-uv tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}"
                                                                             )
                                                                         }
                                                                     }
@@ -936,7 +936,7 @@ pipeline {
                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
                                                     envs = sh(
                                                         label: 'Get tox environments',
-                                                        script: 'uv run --quiet --only-group=tox --isolated tox list -d --no-desc',
+                                                        script: 'uv run --frozen --quiet --only-group=tox --isolated tox list -d --no-desc',
                                                         returnStdout: true,
                                                     ).trim().split('\n')
                                                 }
@@ -969,7 +969,7 @@ pipeline {
                                                                         retry(retryTimes){
                                                                             try{
                                                                                 sh( label: 'Running Tox',
-                                                                                    script: "uv run --only-group=tox-uv --isolated --python-preference system tox run -e ${toxEnv} --runner uv-venv-lock-runner -vv"
+                                                                                    script: "uv run --frozen --only-group=tox-uv --isolated --python-preference system tox run -e ${toxEnv} --runner uv-venv-lock-runner -vv"
                                                                                     )
                                                                             } catch(e){
                                                                                 cleanWs(
@@ -1029,7 +1029,7 @@ pipeline {
                                                      bat(script: 'python -m venv venv && venv\\Scripts\\pip install --disable-pip-version-check uv')
                                                      envs = bat(
                                                          label: 'Get tox environments',
-                                                         script: '@.\\venv\\Scripts\\uv run --quiet --only-group=tox --isolated tox list -d --no-desc --runner=virtualenv',
+                                                         script: '@.\\venv\\Scripts\\uv run --frozen --quiet --only-group=tox --isolated tox list -d --no-desc --runner=virtualenv',
                                                          returnStdout: true,
                                                      ).trim().split('\r\n')
                                                  }
@@ -1071,7 +1071,7 @@ pipeline {
                                                                             ]){
                                                                                 bat(label: 'Running Tox',
                                                                                     script: """uv python install cpython-${version}
-                                                                                               uv run --only-group=tox-uv --isolated tox run -e ${toxEnv} --runner uv-venv-lock-runner -vv
+                                                                                               uv run --frozen --only-group=tox-uv --isolated tox run -e ${toxEnv} --runner uv-venv-lock-runner -vv
                                                                                             """
                                                                                 )
                                                                             }
@@ -1239,7 +1239,7 @@ pipeline {
                                                                                 attempt += 1
                                                                                 withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                                     sh(label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                                       script: """venv/bin/uv run --only-group=tox-uv tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
+                                                                                       script: """venv/bin/uv run --frozen --only-group=tox-uv tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
                                                                                                   rm -rf ./.tox
                                                                                                   rm -rf ./venv
                                                                                                """
@@ -1307,7 +1307,7 @@ pipeline {
                                                                                             withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                                                 powershell(
                                                                                                     label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                                                    script: "uv run --python ${pythonVersion}+gil --only-group=tox-uv --isolated tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
+                                                                                                    script: "uv run --frozen --python ${pythonVersion}+gil --only-group=tox-uv --isolated tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
                                                                                                 )
                                                                                             }
                                                                                         }
@@ -1378,7 +1378,7 @@ pipeline {
                                                                                             withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
                                                                                                 sh(
                                                                                                     label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
-                                                                                                    script: "uv run --python-preference system --only-group=tox-uv tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')} -vv"
+                                                                                                    script: "uv run --frozen --python-preference system --only-group=tox-uv tox run --installpkg ${it.path} --workdir ./.tox -e py${pythonVersion.replace('.', '')} -vv"
                                                                                                     )
                                                                                             }
                                                                                         }
