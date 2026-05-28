@@ -866,9 +866,9 @@ pipeline {
                                         catchError(
                                             buildResult: 'UNSTABLE',
                                             stageResult: 'UNSTABLE',
-                                            message: 'uv-secure found issues. uv.lock might need to updated'
+                                            message: 'uv audit found issues. uv.lock might need to updated'
                                         ) {
-                                            sh 'uv run uv-secure --disable-cache uv.lock'
+                                            sh 'uv audit'
                                         }
                                     }
                                 }
