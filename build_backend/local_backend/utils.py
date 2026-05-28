@@ -3,6 +3,8 @@ import sysconfig
 
 __all__ = ["get_mac_deploy_target"]
 
+class InvalidArchitecture(Exception):
+    pass
 
 def get_mac_deploy_target():
     if deploy_target := os.getenv("MACOSX_DEPLOYMENT_TARGET"):

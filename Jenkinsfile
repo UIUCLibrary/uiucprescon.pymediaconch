@@ -278,7 +278,7 @@ def get_mac_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params, wh
                                     try{
                                         timeout(60){
                                             withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
-                                                sh(label: 'Building wheel', script: "scripts/build_mac_wheel.sh ${pythonVersion}")
+                                                sh(label: 'Building wheel', script: "scripts/build_mac_wheel.sh --python-version=${pythonVersion} --platform=universal2")
                                             }
                                         }
                                         stash includes: 'dist/*.whl', name: "python${pythonVersion} mac wheel"
@@ -372,7 +372,7 @@ def get_mac_abi3_wheel_stages(pythonVersionsTotestAbi3Wheels, testPackages, para
                         timeout(60){
                             try{
                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
-                                    sh(label: 'Building Python ABI3 wheel', script: "scripts/build_mac_wheel.sh abi3")
+                                    sh(label: 'Building Python ABI3 wheel', script: "scripts/build_mac_wheel.sh --python-version=abi3 --platform=universal2")
                                     stash includes: 'dist/*.whl', name: 'python abi3 wheel'
                                 }
                             } finally {

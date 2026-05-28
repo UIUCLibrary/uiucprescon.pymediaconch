@@ -8,7 +8,11 @@ import pprint
 import sys
 import sysconfig
 from typing import List, Type, Callable
+
+from urllib3 import request
+
 from . import utils
+from .config_settings import get_config_settings
 
 from conan.api.conan_api import ConanAPI
 from conan.cli.cli import Cli
@@ -41,14 +45,27 @@ class BaseConanCommandBuilder(AbsConanCommandBuilder):
 
 
 class MacOSConanCommandBuilder(BaseConanCommandBuilder):
-    @staticmethod
-    def determine_mac_archs():
-        key = {"arm64": "armv8", "x86_64": "x86_64"}
+    @classmethod
+    def determine_mac_archs(cls) -> List[str]:
+        key = {
+            "armv8": ["armv8"],
+            "arm64": ["armv8"],
+            "x86_64": ["x86_64"],
+            "universal2": ["armv8", "x86_64"],
+        }
+        config_settings = get_config_settings()
+        if request_arch := config_settings.get("arch"):
+            request_arch = request_arch.lower()
+            if request_arch in key:
+                return key[request_arch]
+            raise utils.InvalidArchitecture(f"Invalid architecture specified in config_settings.json: {request_arch}. Possible values: [{', '.join(key.keys())}]")
+
         cflags = sysconfig.get_config_vars().get("CONFIGURE_CFLAGS")
         arches = []
         for arch in key.keys():
             if arch in cflags:
-                arches.append(key[arch])
+                for a in key.get(arch, []):
+                    arches.append(a)
 
         if len(arches) == 0:
             if cflags:
@@ -64,7 +81,11 @@ class MacOSConanCommandBuilder(BaseConanCommandBuilder):
         try:
             archs = self.determine_mac_archs()
             archs.sort()
-            command.append(f"-s=arch={'|'.join(archs)}")
+            try:
+                command.append(f"-s=arch={'|'.join(archs)}")
+            except TypeError:
+                print(archs)
+                raise
         except ValueError:
             print("No valid architecture found. Using default.")
 
