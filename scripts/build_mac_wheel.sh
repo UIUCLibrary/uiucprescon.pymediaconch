@@ -2,7 +2,7 @@
 INSTALLED_UV=$(command -v uv)
 DEFAULT_BASE_PYTHON="python3"
 REQUIREMENTS_FILE="$(mktemp -d)/constraints.txt"
-MINIMUM_FOR_ABI3="3.12"
+
 set -e
 
 verify_package_with_twine() {
@@ -17,19 +17,37 @@ verify_package_with_twine() {
 }
 
 generate_wheel_with_uv(){
-    uv=$1
-    project_root=$2
-    pythonVersion=$3
-    constraints=$4
+    local uv=$1
+    local project_root=$2
+    local pythonVersion=$3
+    local constraints=$4
+    local arch=$5
 
-    # Get the processor type
-    processor_type=$(uname -m)
     MACOSX_DEPLOYMENT_TARGET='10.13'
-
     out_temp_wheels_dir=$(mktemp -d /tmp/python_wheels.XXXXXX)
     output_path="./dist"
     trap 'rm -rf $out_temp_wheels_dir' ERR SIGINT SIGTERM RETURN
-    MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET $uv build --python="$pythonVersion" --build-constraints "$constraints" --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
+    if [[ "$pythonVersion" == 'abi3' ]]; then
+        uname=$(uname -m)
+        if [[ "$uname" == "x86_64" ]]; then
+            pythonVersion="cpython->=3.12+gil-macos-x86_64"
+        elif [[ "$uname" == "arm64" ]]; then
+            pythonVersion="cpython->=3.12+gil-macos-aarch64"
+        else
+          pythonVersion="cpython->=3.12+gil-macos"
+        fi
+    fi
+    if [ "$arch" == "universal2" ]; then
+        _PYTHON_HOST_PLATFORM="macosx-$MACOSX_DEPLOYMENT_TARGET-universal2"
+    elif [ "$arch" == "arm64" ]; then
+      _PYTHON_HOST_PLATFORM="macosx-$MACOSX_DEPLOYMENT_TARGET-arm64"
+    elif [ "$arch" == "x86_64" ]; then
+      _PYTHON_HOST_PLATFORM="macosx-$MACOSX_DEPLOYMENT_TARGET-x86_64"
+    else
+      echo "unsupported platform type: $arch"
+      exit 1
+    fi
+    _PYTHON_HOST_PLATFORM=$_PYTHON_HOST_PLATFORM MACOSX_DEPLOYMENT_TARGET=$MACOSX_DEPLOYMENT_TARGET $uv build --python="$pythonVersion" --build-constraints "$constraints" --index-strategy=unsafe-best-match --config-setting=arch="$arch" --wheel --out-dir="$out_temp_wheels_dir" "$project_root"
     verify_package_with_twine "$out_temp_wheels_dir"
     search_pattern="$out_temp_wheels_dir/*.whl"
     echo 'Fixing up wheel'
@@ -51,14 +69,15 @@ generate_wheel_with_uv(){
 }
 
 print_usage(){
-    echo "Usage: $0 python_version [--help]"
+    echo "Usage: $0 --python-version= [--help]"
 }
 
 show_help() {
     print_usage
     echo
     echo "Arguments:"
-    echo "  python_version   The version of Python to generate a wheel for."
+    echo "  --python-version   The version of Python to generate a wheel for."
+    echo "  --platform         build for a specific platform (x86_64, arm64, universal2). If not provided, it will be determined based on the current machine."
     echo
     echo "Options:"
     echo "  --help           Display this help message and exit."
@@ -94,10 +113,59 @@ done
 scriptDir=$(dirname "${BASH_SOURCE[0]}")
 # Assign the project_root argument to a variable
 project_root=$(realpath "$scriptDir/..")
-python_version=$1
-if [[ "$python_version" == 'abi3' ]]; then
-    python_version="$MINIMUM_FOR_ABI3"
+
+# Parse optional arguments
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --python-version=*)
+        if [[ -n "${1#*=}" && "${1#*=}" != --* ]]; then
+            version="${1#*=}"
+            python_versions+=("$version")
+            shift
+        else
+          echo "Error: --python-version requires a value"
+          exit 1
+        fi
+      ;;
+    --python-version)
+      shift
+      if [[ -n "$1" && "$1" != --* ]]; then
+        python_versions+=("$1")
+        shift
+      else
+        echo "Error: --python-version requires a value"
+        exit 1
+      fi
+      ;;
+    --platform=*)
+      PLATFORM="${1#*=}"
+      shift
+      ;;
+    --platform)
+      PLATFORM="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown argument: $1"
+      show_help
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$PLATFORM" ]]; then
+  # Get the processor type
+    processor_type=$(uname -m)
+    if [[ "$processor_type" == "x86_64" ]]; then
+        PLATFORM="x86_64"
+    elif [[ "$processor_type" == "arm64" ]]; then
+        PLATFORM="arm64"
+    else
+        echo "Unsupported processor type: $processor_type"
+        exit 1
+    fi
 fi
+
 
 # validate arguments
 check_args
@@ -111,4 +179,7 @@ else
 fi
 "$uv" export --only-group=build --no-hashes --format requirements.txt --no-emit-project --no-annotate --directory "${project_root}" > "$REQUIREMENTS_FILE"
 cat "$REQUIREMENTS_FILE"
-generate_wheel_with_uv "$uv" "$project_root" "$python_version" "$REQUIREMENTS_FILE"
+for python_version in "${python_versions[@]}"; do
+  generate_wheel_with_uv "$uv" "$project_root" "$python_version" "$REQUIREMENTS_FILE" "$PLATFORM"
+done
+

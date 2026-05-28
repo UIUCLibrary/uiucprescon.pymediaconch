@@ -10,6 +10,7 @@ import sysconfig
 from typing import Type, List, Optional
 
 from . import utils
+from  .config_settings import get_config_settings
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -33,6 +34,8 @@ class AbsCMakeCommandBuilder(abc.ABC):
         self.announce = lambda message, level=logging.INFO: logger.log(
             level=level, msg=message
         )
+    @staticmethod
+
 
     @abc.abstractmethod
     def build_command(self) -> List[str]:
@@ -128,8 +131,22 @@ class BaseCMakeCommandBuilder(AbsCMakeCommandBuilder):
 class MacOSCMakeCommandBuilder(BaseCMakeCommandBuilder):
     conan_preset_name = "conan-release"
 
-    @staticmethod
-    def determine_arches():
+    @classmethod
+    def determine_arches(cls):
+        config_settings = get_config_settings()
+        if requested_arch := config_settings.get("arch"):
+            key = {
+                "armv8": ["arm64"],
+                "arm64": ["arm64"],
+                "x86_64": ["x86_64"],
+                "universal2": ["arm64", "x86_64"],
+            }
+            request_arch = requested_arch.lower()
+            if request_arch in key:
+                return key[request_arch]
+            raise utils.InvalidArchitecture(
+                f"Invalid architecture specified in config_settings.json: {request_arch}. Possible values: [{', '.join(key.keys())}]")
+
         cflags = sysconfig.get_config_vars().get("CONFIGURE_CFLAGS")
         arches = []
         for arch in ["arm64", "x86_64"]:
@@ -148,7 +165,7 @@ class MacOSCMakeCommandBuilder(BaseCMakeCommandBuilder):
 
         try:
             command.append(
-                f"-DCMAKE_OSX_ARCHITECTURES={';'.join(self.determine_arches())}"
+                f"-DCMAKE_OSX_ARCHITECTURES:STRING={';'.join(self.determine_arches())}"
             )
         except ValueError:
             print("No valid architecture found. Using default.")

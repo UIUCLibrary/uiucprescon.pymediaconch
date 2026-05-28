@@ -19,7 +19,6 @@ authors = [
 readme = {file = "README.md", content-type = "text/markdown"}
 
 [dependency-groups]
-audit-dependencies = ['uv-secure']
 test = ["coverage", "pytest"]
 tox = ["tox"]
 tox-uv = [
@@ -34,7 +33,6 @@ docs = [
     'tomli;python_version<"3.11"',
 ]
 dev = [
-    {include-group = "audit-dependencies"},
     {include-group = "docs"},
     {include-group = "test"},
     {include-group = "tox"},
