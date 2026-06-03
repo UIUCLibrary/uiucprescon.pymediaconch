@@ -1,0 +1,17 @@
+{
+  "buckets": [
+    {
+      "Name": "main"
+    }
+  ],
+  "apps": [
+    {
+      "Source": "main",
+      "Name": "git"
+    },
+    {
+      "Source": "main",
+      "Name": "uv"
+    }
+  ]
+}
