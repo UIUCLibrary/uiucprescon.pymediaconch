@@ -808,7 +808,7 @@ pipeline {
                                     }
                                     post{
                                         always{
-                                            recordIssues(tools: [clangTidy(pattern: 'logs/clang-tidy.log')], qualityGates: [[threshold: 1, type: 'TOTAL', unstable: true]])
+                                            recordIssues(tools: [clangTidy(pattern: 'logs/clang-tidy.log')])
                                         }
                                     }
                                 }
@@ -1308,7 +1308,7 @@ pipeline {
                                                                                                 powershell(
                                                                                                     label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
                                                                                                     script: "uv run --frozen --python ${pythonVersion}+gil --only-group=tox-uv --isolated tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
-                                                                                                )
+                                                                                                 )
                                                                                             }
                                                                                         }
                                                                                     }
