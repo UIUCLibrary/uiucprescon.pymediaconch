@@ -7,7 +7,7 @@ class MediaConch(ConanFile):
 
     def requirements(self):
         self.requires("zlib/1.3.1")
-        self.requires("libxslt/1.1.43")
+        self.requires("libxslt/1.1.45")
         self.requires("libxml2/2.13.8")
         self.requires("libmediainfo/26.01")
 
