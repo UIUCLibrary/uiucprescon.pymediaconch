@@ -26,9 +26,6 @@ ARG CONAN_CENTER_PROXY_V2_URL=https://center2.conan.io
 # If you want to use a diffrent remote for Conan, such as a proxy. Set the CONAN_CENTER_PROXY_V2_URL
 # Not this is only for building the image. The actual conan center proxy URL is set in the remotes.json file.
 
-ARG CHOCOLATEY_SOURCE=https://chocolatey.org/api/v2
-# URL for Chocolatey packages. By default, it will use the official Chocolatey repository.
-
 FROM ${FROM_IMAGE} AS certsgen
 RUN certutil -generateSSTFromWU roots.sst
 
@@ -45,30 +42,22 @@ ARG VS_DevPowershellArguments='-arch=amd64'
 RUN c:/scripts/install_msvc.ps1 -InstallPath ${Env:VS_INSTALL_PATH} -VSConfigFile c:/setup/config.vsconfig -DevCmdArguments ${Env:VS_DevCmdArguments} -DevPowershellArguments ${Env:VS_DevPowershellArguments} -VSVersion ${Env:VS_VERSION}; `
     Write-Host "Note: Exporting this layer can take a while."
 
-ARG CHOCOLATEY_SOURCE
-ARG ChocolateyEnvironmentDebug=false
-COPY scripts/resources/windows/chocolatey/ c:/choco/
-RUN Set-ExecutionPolicy Bypass -Scope Process -Force; `
-    $chocolateyDownloadUrl = c:/choco/get_latest_chocolatey_url.ps1 -packageRepo $env:CHOCOLATEY_SOURCE; `
-    c:/choco/install.ps1 -ChocolateyDownloadUrl $chocolateyDownloadUrl;`
-    . $profile;`
-    if( -not ([string]::IsNullOrEmpty($Env:CHOCOLATEY_SOURCE ))) `
-    { `
-        Write-Host "Adding $env:CHOCOLATEY_SOURCE to chocolatey sources" ; `
-        choco source add -n=CHOCOLATEY_SOURCE --priority=1 -s=\"${env:CHOCOLATEY_SOURCE}\"; `
-    }; `
-    Write-Host "Disabling Showing Download Progress" ; `
-    choco feature disable -n=showDownloadProgress ; `
-    C:\ProgramData\chocolatey\bin\choco.exe sources ; `
-    C:\ProgramData\chocolatey\bin\choco.exe install -y --stoponfirstfailure --no-progress c:/choco/packages.config ;`
-    refreshenv ; `
-    choco cache remove --confirm;`
-    Write-Host "Finished install packages with Chocolatey" ;`
-    Write-Host "Verifying installed packages" ;`
-    c:/choco/verifyenv.ps1 ;`
-    Write-Host "Verifying installed packages - Done"
+COPY scripts/resources/windows/scoop/ c:/scoopinstall/
 
-RUN uv python update-shell
+RUN irm get.scoop.sh -outfile 'install.ps1' ; `
+    .\install.ps1 -RunAsAdmin ; `
+    Remove-Item -Path ".\install.ps1" ; `
+    scoop install git ; `
+    scoop import c:/scoopinstall/scoopfile.json ; `
+    uv python update-shell ;`
+    command Get-ChildItem c:\ ; `
+    scoop cache show ; `
+    Write-Host "Cleaning up cache" ;`
+    scoop cache clean ; `
+    Write-Host "Cleaning up cache - Done" ;`
+    Write-Host "Verifying installed packages" ;`
+    c:/scoopinstall/verifyenv.ps1 ;`
+    Write-Host "Verifying installed packages - Done"
 
 ## ==============================================================================
 FROM base_builder AS conan_builder

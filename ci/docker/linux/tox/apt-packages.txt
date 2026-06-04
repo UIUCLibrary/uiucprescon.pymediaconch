@@ -1,4 +1,6 @@
 build-essential
+ffmpeg
+git
 python3-pip
 python3.11-dev
 python3.11-venv
@@ -6,4 +8,3 @@ python3.12-dev
 python3.12-venv
 python3.13-dev
 python3.13-venv
-git

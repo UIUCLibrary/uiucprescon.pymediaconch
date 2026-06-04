@@ -2,6 +2,7 @@
 // Created by Borchers, Henry Samuel on 7/30/25.
 //
 #include <nanobind/nanobind.h>
+#include <nanobind/stl/string.h>
 #include <MediaConchDLL.h>
 
 namespace nb = nanobind;

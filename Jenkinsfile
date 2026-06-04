@@ -116,6 +116,7 @@ def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelS
                                                         node("docker && linux && ${arch}"){
                                                             checkout scm
                                                             unstash "python${pythonVersion} linux - ${arch} - wheel"
+                                                            unstash 'SAMPLE_FILES'
                                                             try{
                                                                 docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share:exec --tmpfs /.local/bin:exec")
                                                                 {
@@ -183,7 +184,7 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                         try{
                                             def dockerImageName = "${currentBuild.fullProjectName}_${UUID.randomUUID().toString()}".replaceAll("-", "_").replaceAll('/', "_").replaceAll(' ', "").toLowerCase()
                                             try{
-                                                withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
+                                                withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}"]){
                                                     sh( script: "scripts/build_linux_wheels.sh --python-version abi3 --docker-image-name  ${dockerImageName}")
                                                 }
                                                 stash includes: 'dist/*manylinux*.*whl', name: "python abi3 linux - ${arch} - wheel"
@@ -218,11 +219,12 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                         docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec --tmpfs /.local/share:exec --tmpfs /.local/bin:exec") {
                                                             sh "uv python install ${pythonVersion}"
                                                             unstash "python abi3 linux - ${arch} - wheel"
+                                                            unstash 'SAMPLE_FILES'
                                                             findFiles(glob: 'dist/*manylinux*.*whl').each{
                                                                 def attempt = 0
                                                                 retry(2){
                                                                     attempt += 1
-                                                                    withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                    withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0', "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files"]){
                                                                         timeout(60){
                                                                             sh(label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
                                                                                script: "uv run --frozen --only-group=tox-uv tox --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
@@ -315,8 +317,9 @@ def get_mac_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params, wh
                                                                         try{
                                                                             withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
                                                                                 unstash "python${pythonVersion} mac wheel"
+                                                                                unstash 'SAMPLE_FILES'
                                                                                 findFiles(glob: 'dist/*.whl').each{
-                                                                                    withEnv(["TOX_UV_PATH=${WORKSPACE}/venv/bin/uv"]){
+                                                                                    withEnv(["TOX_UV_PATH=${WORKSPACE}/venv/bin/uv", "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files"]){
                                                                                         timeout(60){
                                                                                             sh(label: 'Running Tox',
                                                                                                script: """python${pythonVersion} -m venv venv
@@ -373,7 +376,7 @@ def get_mac_abi3_wheel_stages(pythonVersionsTotestAbi3Wheels, testPackages, para
                             try{
                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
                                     sh(label: 'Building Python ABI3 wheel', script: "scripts/build_mac_wheel.sh --python-version=abi3 --platform=universal2")
-                                    stash includes: 'dist/*.whl', name: 'python abi3 wheel'
+                                    stash includes: 'dist/*.whl', name: 'macos python abi3 wheel'
                                 }
                             } finally {
                                 sh "${tool(name: 'Default', type: 'git')} clean -dffx"
@@ -397,9 +400,10 @@ def get_mac_abi3_wheel_stages(pythonVersionsTotestAbi3Wheels, testPackages, para
                                 node("mac && python${pythonVersion} && ${arch}"){
                                     checkout scm
                                     try{
-                                        unstash 'python abi3 wheel'
+                                        unstash 'macos python abi3 wheel'
+                                        unstash 'SAMPLE_FILES'
                                         findFiles(glob: 'dist/*.whl').each{
-                                            withEnv(["TOX_UV_PATH=${WORKSPACE}/venv/bin/uv"]){
+                                            withEnv(["TOX_UV_PATH=${WORKSPACE}/venv/bin/uv", "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files"]){
                                                 timeout(60){
                                                     sh(label: 'Running Tox',
                                                        script: """python${pythonVersion} -m venv venv
@@ -504,11 +508,12 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                                                 bat "python -m pip install --disable-pip-version-check uv"
                                                                 bat "uv python install ${pythonVersion}"
                                                                 unstash "python${pythonVersion} windows wheel"
+                                                                unstash 'SAMPLE_FILES'
                                                                 findFiles(glob: 'dist/*.whl').each{
                                                                     def attempt = 0
                                                                     retry(2){
                                                                         attempt += 1
-                                                                        withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                        withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0', "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files"]){
                                                                             bat(
                                                                                 label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
                                                                                 script: "uv run --frozen --only-group=tox-uv -p ${pythonVersion} tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}"
@@ -626,13 +631,14 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
                                                         try{
                                                             withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
                                                                 unstash 'python abi3 windows wheel'
+                                                                unstash 'SAMPLE_FILES'
                                                                 bat 'python -m pip install --disable-pip-version-check uv'
                                                                 bat "uv python install ${pythonVersion}"
                                                                 findFiles(glob: 'dist/*.whl').each{
                                                                     def attempt = 0
                                                                     retry(2){
                                                                         attempt += 1
-                                                                        withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                        withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0', "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files"]){
                                                                             bat(
                                                                                 label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
                                                                                 script: "uv run --frozen --python ${pythonVersion}+gil --only-group=tox-uv tox run -e py${pythonVersion.replace('.', '')}  --installpkg ${it.path}"
@@ -687,6 +693,35 @@ pipeline {
         booleanParam(name: 'DEPLOY_PYPI', defaultValue: false, description: 'Deploy to pypi')
     }
     stages {
+        stage('Generate sample files'){
+            when{
+                anyOf{
+                    equals expected: true, actual: params.RUN_CHECKS
+                    equals expected: true, actual: params.TEST_RUN_TOX
+                    equals expected: true, actual: params.TEST_PACKAGES
+                }
+                beforeAgent true
+            }
+            agent {
+                dockerfile {
+                    filename 'ci/docker/linux/jenkins/Dockerfile'
+                    label 'linux && docker && x86'
+                    args "--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment --tmpfs /cache:exec"
+                    additionalBuildArgs '--build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci'
+                }
+            }
+            environment{
+                PIP_CACHE_DIR='/tmp/pipcache'
+                UV_TOOL_DIR='/tmp/uvtools'
+                UV_PYTHON_CACHE_DIR='/tmp/uvpython'
+                UV_CACHE_DIR='/tmp/uvcache'
+                UV_CONFIG_FILE="${createUnixUvConfig()}"
+            }
+            steps{
+                sh 'uv run --no-project tests/sample_media_files.py create ./sample_files'
+                stash includes: "sample_files/*", name: 'SAMPLE_FILES'
+            }
+        }
         stage('Building and Testing'){
             when{
                 anyOf{
@@ -815,8 +850,10 @@ pipeline {
                                 stage('Running Unit Tests'){
                                     environment{
                                         PYTEST_JUNIT_XML='reports/pytest/junit-pytest.xml'
+                                        PYMEDIACONCH_SAMPLE_FILES="${WORKSPACE}/sample_files"
                                     }
                                     steps{
+                                        unstash 'SAMPLE_FILES'
                                         sh(
                                             label: 'Running pytest',
                                             script: '''mkdir -p reports/pytestcoverage
@@ -964,8 +1001,10 @@ pipeline {
                                                                 image.inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /cache:exec --tmpfs /.local/share:exec --tmpfs /.local/bin:exec -e TOX_WORK_DIR=/cache/tox -e UV_PROJECT_ENVIRONMENT=/cache/uv_project_environment") {
                                                                     withEnv([
                                                                         "UV_CONFIG_FILE=${createUnixUvConfig()}",
-                                                                        "UV_LOCK_TIMEOUT=600"
-                                                                        ]){
+                                                                        "UV_LOCK_TIMEOUT=600",
+                                                                        "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files"
+                                                                    ]){
+                                                                        unstash 'SAMPLE_FILES'
                                                                         retry(retryTimes){
                                                                             try{
                                                                                 sh( label: 'Running Tox',
@@ -1025,7 +1064,8 @@ pipeline {
                                                         "--mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} " +
                                                         "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                 ){
-                                                 withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}"]){
+                                                 withEnv([
+                                                    "UV_CONFIG_FILE=${createWindowUVConfig()}"]){
                                                      bat(script: 'python -m venv venv && venv\\Scripts\\pip install --disable-pip-version-check uv')
                                                      envs = bat(
                                                          label: 'Get tox environments',
@@ -1049,7 +1089,7 @@ pipeline {
                                                         checkout scm
                                                         lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
                                                             retry(retryTimes){
-                                                                image = docker.build(UUID.randomUUID().toString(), '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE --label=purpose=ci' +  (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
+                                                                image = docker.build(UUID.randomUUID().toString(), '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci' +  (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
                                                             }
                                                         }
                                                         try{
@@ -1062,11 +1102,13 @@ pipeline {
                                                                              "--mount type=volume,source=pipcache,target=${env.PIP_CACHE_DIR} " +
                                                                              "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                                 ){
+                                                                    unstash 'SAMPLE_FILES'
                                                                     retry(retryTimes){
                                                                         try{
                                                                             withEnv([
                                                                             "UV_CONFIG_FILE=${createWindowUVConfig()}",
                                                                             'SETUPTOOLS_BUILD_TEMP_DIR=c:\\temp\\build',
+                                                                            "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files",
                                                                             'DISTUTILS_DEBUG=1',
                                                                             ]){
                                                                                 bat(label: 'Running Tox',
@@ -1232,12 +1274,13 @@ pipeline {
                                                                           venv/bin/uv python install ${pythonVersion}
                                                                        """
                                                                     unstash 'python sdist'
+                                                                    unstash 'SAMPLE_FILES'
                                                                     try{
                                                                         findFiles(glob: 'dist/*.tar.gz').each{
                                                                             def attempt = 0
                                                                             retry(2){
                                                                                 attempt += 1
-                                                                                withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                                withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0', "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files"]){
                                                                                     sh(label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
                                                                                        script: """venv/bin/uv run --frozen --only-group=tox-uv tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv
                                                                                                   rm -rf ./.tox
@@ -1280,7 +1323,7 @@ pipeline {
                                                                             checkout scm
                                                                             lock("docker build-${env.NODE_NAME}"){
                                                                                 def dockerImageName = "${currentBuild.fullProjectName}_${UUID.randomUUID().toString()}".replaceAll("-", "_").replaceAll('/', "_").replaceAll(' ', "").toLowerCase()
-                                                                                dockerImage = docker.build(dockerImageName, '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --build-arg CHOCOLATEY_SOURCE --label=purpose=ci' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
+                                                                                dockerImage = docker.build(dockerImageName, '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci' + (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
                                                                             }
                                                                             withEnv([
                                                                                 'UV_PYTHON_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
@@ -1299,12 +1342,13 @@ pipeline {
                                                                                     '--mount type=volume,source=uv_cache_dir,target=$UV_CACHE_DIR'
                                                                                 ){
                                                                                     unstash 'python sdist'
+                                                                                    unstash 'SAMPLE_FILES'
                                                                                     bat "uv python install cpython-${pythonVersion}"
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
                                                                                         def attempt = 0
                                                                                         retry(2){
                                                                                             attempt += 1
-                                                                                            withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0']){
+                                                                                            withEnv([(attempt == 1) ? "UV_OFFLINE=1" : 'UV_OFFLINE=0', "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files"]){
                                                                                                 powershell(
                                                                                                     label: "Running Tox: ${(attempt == 1) ? "Offline" : 'Online'}",
                                                                                                     script: "uv run --frozen --python ${pythonVersion}+gil --only-group=tox-uv --isolated tox run --installpkg ${it.path} -e py${pythonVersion.replace('.', '')} -vv"
@@ -1371,6 +1415,7 @@ pipeline {
                                                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
                                                                                     sh "uv python install ${pythonVersion}"
                                                                                     unstash 'python sdist'
+                                                                                    unstash 'SAMPLE_FILES'
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
                                                                                         def attempt = 0
                                                                                         retry(2){
