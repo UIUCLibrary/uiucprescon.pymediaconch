@@ -19,7 +19,7 @@ find_package(Libevent QUIET)
 FetchContent_Declare(
     MediaConchSource
         GIT_REPOSITORY https://github.com/MediaArea/MediaConch_SourceCode.git
-        GIT_TAG        5823658764db3dc7f5d7b82b8f8909cfad43f7d8
+        GIT_TAG        b3790f2c965b6efd3bb5c0191159c26f6f98a2e7
         EXCLUDE_FROM_ALL
 )
 
