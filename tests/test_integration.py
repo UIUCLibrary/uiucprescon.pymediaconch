@@ -29,7 +29,6 @@ def test_integration(sample_files, tmpdir, monkeypatch):
     bar_and_tone = test_path / 'bars.mp4'
     shutil.copy(str(sample_files['bars_and_tone_file']), str(bar_and_tone))
     monkeypatch.chdir(test_path)
-    print(f"getcwd = {os.getcwd()}")
 
     mc = mediaconch.MediaConch()
     mc.set_format(mediaconch.MediaConch_format_t.MediaConch_format_Json)
