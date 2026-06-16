@@ -1471,7 +1471,7 @@ pipeline {
                     }
                     agent {
                         docker{
-                            image 'python'
+                            image 'ghcr.io/astral-sh/uv:debian'
                             label 'docker && linux'
                             args "--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp"
                         }
@@ -1526,19 +1526,13 @@ pipeline {
                                 [
                                     usernamePassword(
                                         credentialsId: 'jenkins-nexus',
-                                        passwordVariable: 'TWINE_PASSWORD',
-                                        usernameVariable: 'TWINE_USERNAME'
+                                        passwordVariable: 'UV_PUBLISH_PASSWORD',
+                                        usernameVariable: 'UV_PUBLISH_USERNAME'
                                     )
                                 ]){
                                     sh(
                                         label: 'Uploading to pypi',
-                                        script: '''python3 -m venv venv
-                                                   trap "rm -rf venv" EXIT
-                                                   ./venv/bin/pip install --disable-pip-version-check uv
-                                                   . ./venv/bin/activate
-                                                   uv sync --active --frozen --only-group deploy
-                                                   upload --disable-progress-bar --non-interactive dist/*
-                                                '''
+                                        script: 'uv publish dist/*'
                                     )
                             }
                         }
