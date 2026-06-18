@@ -679,6 +679,9 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
 
 pipeline {
     agent none
+    options{
+        preserveStashes()
+    }
     parameters {
         booleanParam(name: 'RUN_CHECKS', defaultValue: true, description: 'Run checks on code')
         booleanParam(name: 'TEST_RUN_TOX', defaultValue: false, description: 'Run Tox Tests')
