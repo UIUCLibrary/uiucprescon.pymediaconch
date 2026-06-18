@@ -17,7 +17,7 @@ def SUPPORTED_MAC_VERSIONS_ABI3 = ['3.12', '3.13', '3.14']
 def SUPPORTED_LINUX_VERSIONS_NONABI3 = ['3.11']
 def SUPPORTED_LINUX_VERSIONS_ABI3 = ['3.12', '3.13', '3.14']
 
-def retryTimes = 1
+def retryTimes = 2
 
 def wheelStashes = []
 
