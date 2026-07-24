@@ -1,4 +1,5 @@
 function Build-Wheel {
+    [CmdletBinding()]
     param (
         [string]$SourceDirectory,
         [string]$OutputDirectory,
@@ -6,17 +7,43 @@ function Build-Wheel {
     )
 
     function New-ShadowCopy {
+        [CmdletBinding()]
         param (
             [string]$Source,
             [string]$Destination
         )
+        Write-Verbose 'New-ShadowCopy'
         if (Test-Path -Path $Destination) {
+            Write-Verbose "Removing $Destination"
             Remove-Item -Path $Destination -Recurse -Force
         }
+        Write-Verbose "Creating $Destination"
         New-Item -ItemType Directory -Path $Destination | Out-Null
-        Get-ChildItem -Path $Source | ForEach-Object {
-            $linkPath = Join-Path -Path $Destination -ChildPath $_.Name
-            New-Item -ItemType SymbolicLink -Path $linkPath -Target $_.FullName | Out-Null
+
+        Write-Verbose "Listing $Source"
+        Get-ChildItem -Path $Source -Recurse | ForEach-Object {
+            if ($_.Name -eq '__pycache__') {
+                Write-Verbose "Skipping: $($_.FullName)"
+                return
+            }
+            if ($_.Extension -eq '.pyc'){
+                Write-Verbose "Skipping: $($_.FullName)"
+                return
+            }
+            if ($_.PSIsContainer) {
+                return
+            }
+            Push-Location $Source
+            try{
+                $relPath = Resolve-Path $_.FullName -Relative
+            } finally {
+                Pop-Location
+            }
+            $linkPath = Join-Path -Path $Destination -ChildPath $relPath
+            Write-Verbose "Creating symlink for $relPath in $Destination"
+
+            New-Item -ItemType SymbolicLink -Path $linkPath -Target $_.FullName -Force | Out-Null
+
         }
     }
 
@@ -27,10 +54,16 @@ function Build-Wheel {
             [string]$PythonVersion,
             [string]$BuildConstraints
         )
-        uv build --build-constraints=$BuildConstraints --python=$PythonVersion --wheel --out-dir=$Output --config-setting=conan_cache=C:/Users/ContainerAdministrator/.conan2 $Source
-        if ($LASTEXITCODE -ne 0)
-        {
-            throw "Failed to build Python wheel"
+        pushd $Source
+        try{
+            uv build -vv --build-constraints=$BuildConstraints --python=$PythonVersion --wheel --out-dir=$Output --config-setting=conan_cache=C:/Users/ContainerAdministrator/.conan2 $Source
+            if ($LASTEXITCODE -ne 0)
+            {
+                Get-ChildItem -Recurse -Path $Source -FollowSymlink
+                throw "Failed to build Python wheel"
+            }
+        } finally {
+            popd
         }
     }
 
@@ -54,7 +87,6 @@ function Build-Wheel {
             throw "Twine check failed for package: $PackagePath"
         }
     }
-
     Write-Host "Python Version: $PythonVersion"
 
     Write-Host "Creating shadow copy of source directory..."
