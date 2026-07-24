@@ -255,7 +255,7 @@ function InstallMSVC{
             Get-Process -Name $updateProcesses -ErrorAction SilentlyContinue | Format-Table -AutoSize
             Write-Host "Updating..."
 
-            Start-Sleep -Seconds 30
+            Start-Sleep -Seconds 60
         }
 
         Write-Host "Windows Update processes have finished."
@@ -307,7 +307,7 @@ function AddVsStudioToCMD {
         [string]$DevCmdArguments = '-arch=amd64'
     )
     $VsDevCmdPath = Join-Path -Path $VSInstallPath -ChildPath "Common7\Tools\VsDevCmd.bat"
-    $autoRunCmd = "@if not defined DevEnvDir ( CALL ${VsDevCmdPath} ${DevCmdArguments} )"
+    $autoRunCmd = "@if not defined DevEnvDir ( if defined DEV_ENV_ARGUMENTS ( CALL ${VsDevCmdPath} %DEV_ENV_ARGUMENTS% ) else (CALL ${VsDevCmdPath} ${DevCmdArguments} ) ) )"
     Set-ItemProperty -Path 'HKLM:\Software\Microsoft\Command Processor' -Name 'AutoRun' -Value $autoRunCmd
     Write-Host "Testing for CL in cmd.exe"
 
@@ -336,7 +336,8 @@ function AddVsStudioToPowershell{
     $powershellScript = @(
         "if (Test-Path -Path ${modulePath}) {",
         "Import-Module `'$modulePath`'",
-        "Enter-VsDevShell -VsInstallPath ${VSInstallPath} -DevCmdArguments ${DevCmdArguments}",
+        "`$DevCmdArguments = if (`$env:DEV_ENV_ARGUMENTS) { `$env:DEV_ENV_ARGUMENTS } else { `"$DevCmdArguments`" }",
+        "Enter-VsDevShell -VsInstallPath ${VSInstallPath} -DevCmdArguments `${DevCmdArguments}",
         '} else {',
         '   Write-Host "Visual Studio Build Tools not found"',
         '}'
