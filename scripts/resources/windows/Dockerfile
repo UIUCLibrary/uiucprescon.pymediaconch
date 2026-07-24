@@ -26,6 +26,8 @@ ARG CONAN_CENTER_PROXY_V2_URL=https://center2.conan.io
 # If you want to use a diffrent remote for Conan, such as a proxy. Set the CONAN_CENTER_PROXY_V2_URL
 # Not this is only for building the image. The actual conan center proxy URL is set in the remotes.json file.
 
+ARG DEV_ENV_ARGUMENTS="-arch=amd64"
+
 FROM ${FROM_IMAGE} AS certsgen
 RUN certutil -generateSSTFromWU roots.sst
 
@@ -70,6 +72,7 @@ COPY conanfile.py c:/temp/conanfile.py
 COPY conan.lock c:/temp/conan.lock
 ENV UV_FROZEN=1 `
     UV_PROJECT=c:/temp/project
+ARG DEV_ENV_ARGUMENTS
 ARG CONAN_CENTER_PROXY_V2_URL
 RUN uv run --only-group=build conan profile detect --exist-ok ; `
     if (${env:CONAN_CENTER_PROXY_V2_URL} -ne $(Get-Content -Raw -Path ${Env:CONAN_HOME}\remotes.json)) { `
