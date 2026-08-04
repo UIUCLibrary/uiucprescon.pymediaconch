@@ -118,10 +118,10 @@ def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelS
                                                             unstash "python${pythonVersion} linux - ${arch} - wheel"
                                                             unstash 'SAMPLE_FILES'
                                                             try{
-                                                                docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share:exec --tmpfs /.local/bin:exec")
+                                                                docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share:exec --tmpfs /.local/bin:exec -e PATH=\"/.local/bin:\$PATH\"")
                                                                 {
                                                                     withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}"]){
-                                                                        sh "uv python install ${pythonVersion}"
+                                                                        sh(label: 'Installing required Python version if not already installed', script: "uv python find cpython-${pythonVersion} --quiet 2>/dev/null || uv python install cpython-${pythonVersion}")
                                                                         def attempt = 0
                                                                         retry(2){
                                                                             attempt += 1
@@ -216,8 +216,8 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                                         'UV_PYTHON_CACHE_DIR=/tmp/uvpython',
                                                         'UV_CACHE_DIR=/tmp/uvcache',
                                                     ]){
-                                                        docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec --tmpfs /.local/share:exec --tmpfs /.local/bin:exec") {
-                                                            sh "uv python install ${pythonVersion}"
+                                                        docker.image('ghcr.io/astral-sh/uv:debian').inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.cache:exec --tmpfs /.local/share:exec --tmpfs /.local/bin:exec -e PATH=\"/.local/bin:\$PATH\"") {
+                                                            sh(label: 'Installing required Python version if not already installed', script: "uv python find cpython-${pythonVersion} --quiet 2>/dev/null || uv python install cpython-${pythonVersion}")
                                                             unstash "python abi3 linux - ${arch} - wheel"
                                                             unstash 'SAMPLE_FILES'
                                                             findFiles(glob: 'dist/*manylinux*.*whl').each{
@@ -506,7 +506,7 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                                         try{
                                                             withEnv(["UV_CONFIG_FILE=${createWindowUVConfig()}",]){
                                                                 bat "python -m pip install --disable-pip-version-check uv"
-                                                                bat "uv python install ${pythonVersion}"
+                                                                bat(label: 'Installing required Python version if not already installed', script: "uv python find cpython-${pythonVersion} --quiet 2>nul || uv python install cpython-${pythonVersion}")
                                                                 unstash "python${pythonVersion} windows wheel"
                                                                 unstash 'SAMPLE_FILES'
                                                                 findFiles(glob: 'dist/*.whl').each{
@@ -633,7 +633,7 @@ def get_windows_abi3_wheel_stages(pythonVersionsAbi3, testPackages, params, whee
                                                                 unstash 'python abi3 windows wheel'
                                                                 unstash 'SAMPLE_FILES'
                                                                 bat 'python -m pip install --disable-pip-version-check uv'
-                                                                bat "uv python install ${pythonVersion}"
+                                                                bat(label: 'Installing required Python version if not already installed', script: "uv python find cpython-${pythonVersion} --quiet 2>nul || uv python install cpython-${pythonVersion}")
                                                                 findFiles(glob: 'dist/*.whl').each{
                                                                     def attempt = 0
                                                                     retry(2){
@@ -1007,6 +1007,7 @@ pipeline {
                                                                         "UV_LOCK_TIMEOUT=600",
                                                                         "PYMEDIACONCH_SAMPLE_FILES=${WORKSPACE}/sample_files"
                                                                     ]){
+                                                                        sh(label: 'Installing required Python version if not already installed', script: "uv python find cpython-${version} --quiet 2>/dev/null || uv python install cpython-${version}")
                                                                         unstash 'SAMPLE_FILES'
                                                                         retry(retryTimes){
                                                                             try{
@@ -1106,6 +1107,7 @@ pipeline {
                                                                              "--mount type=volume,source=uv_cache_dir,target=${env.UV_CACHE_DIR}"
                                                                 ){
                                                                     unstash 'SAMPLE_FILES'
+                                                                    bat(label: 'Installing required Python version if not already installed', script: "uv python find cpython-${version} --quiet 2>nul || uv python install cpython-${version}")
                                                                     retry(retryTimes){
                                                                         try{
                                                                             withEnv([
@@ -1115,9 +1117,7 @@ pipeline {
                                                                             'DISTUTILS_DEBUG=1',
                                                                             ]){
                                                                                 bat(label: 'Running Tox',
-                                                                                    script: """uv python install cpython-${version}
-                                                                                               uv run --frozen --only-group=tox-uv --isolated tox run -e ${toxEnv} --runner uv-venv-lock-runner -vv
-                                                                                            """
+                                                                                    script: "uv run --frozen --only-group=tox-uv --isolated tox run -e ${toxEnv} --runner uv-venv-lock-runner -vv"
                                                                                 )
                                                                             }
                                                                         } catch (e){
@@ -1274,7 +1274,7 @@ pipeline {
                                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
                                                                     sh """python3 -m venv venv
                                                                           venv/bin/pip install --disable-pip-version-check uv
-                                                                          venv/bin/uv python install ${pythonVersion}
+                                                                          venv/bin/uv python find cpython-${pythonVersion} --quiet 2>/dev/null || venv/bin/uv python install cpython-${pythonVersion}
                                                                        """
                                                                     unstash 'python sdist'
                                                                     unstash 'SAMPLE_FILES'
@@ -1346,7 +1346,7 @@ pipeline {
                                                                                 ){
                                                                                     unstash 'python sdist'
                                                                                     unstash 'SAMPLE_FILES'
-                                                                                    bat "uv python install cpython-${pythonVersion}"
+                                                                                    bat(label: 'Installing required Python version if not already installed', script: "uv python find cpython-${pythonVersion} --quiet 2>nul || uv python install cpython-${pythonVersion}")
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
                                                                                         def attempt = 0
                                                                                         retry(2){
@@ -1416,7 +1416,7 @@ pipeline {
                                                                         ]){
                                                                             dockerImage.inside("--label=purpose=ci --label \"absoluteUrl=${currentBuild.absoluteUrl}\" --label \"JOB_NAME=${env.JOB_NAME}\" --label \"BUILD_NUMBER=${currentBuild.number}\" --mount source=python-tmp-uiucpreson-pymediaconch,target=/tmp --tmpfs /.local/share:exec --tmpfs /.local/bin:exec"){
                                                                                 withEnv(["UV_CONFIG_FILE=${createUnixUvConfig()}",]){
-                                                                                    sh "uv python install ${pythonVersion}"
+                                                                                    sh(label: 'Installing required Python version if not already installed', script: "uv python find cpython-${pythonVersion} --quiet 2>/dev/null || uv python install cpython-${pythonVersion}")
                                                                                     unstash 'python sdist'
                                                                                     unstash 'SAMPLE_FILES'
                                                                                     findFiles(glob: 'dist/*.tar.gz').each{
