@@ -21,7 +21,7 @@ ARG PIP_CACHE_DIR=/.cache/pip
 FROM quay.io/pypa/manylinux_2_28 AS base
 
 RUN --mount=type=cache,target=/var/cache/yum \
-    yum install -y lndir
+    yum install -y lndir libffi-devel
 
 # ==============================================================================
 FROM base AS conan_builder
