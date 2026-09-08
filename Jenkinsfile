@@ -58,13 +58,12 @@ def createUnixUvConfig(){
 def get_linux_nonabi3_wheels_stages(pythonVersions, testPackages, params, wheelStashes, retryTimes){
     def selectedArches = []
     def allValidArches = [
-        // Arm64 on linux won't build libcurl
-        //'arm64',
+        'arm64',
         'x86_64'
     ]
-//     if(params.INCLUDE_LINUX_ARM == true){
-//         selectedArches << 'arm64'
-//     }
+    if(params.INCLUDE_LINUX_ARM == true){
+        selectedArches << 'arm64'
+    }
     if(params.INCLUDE_LINUX_X86_64 == true){
         selectedArches << 'x86_64'
     }
@@ -161,12 +160,12 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
     def selectedArches = []
     def allValidArches = [
         // Arm64 on linux won't build libcurl
-        //'arm64',
+        'arm64',
         'x86_64'
     ]
-//     if(params.INCLUDE_LINUX_ARM == true){
-//         selectedArches << 'arm64'
-//     }
+    if(params.INCLUDE_LINUX_ARM == true){
+        selectedArches << 'arm64'
+    }
     if(params.INCLUDE_LINUX_X86_64 == true){
         selectedArches << 'x86_64'
     }
@@ -244,6 +243,8 @@ def get_linux_abi3_wheels_stages(abi3PythonVersions, testPackages, params, wheel
                                 })
                             }
                         }
+                    } else {
+                        Utils.markStageSkippedForConditional(newVersionStage)
                     }
                 }
             }
@@ -687,8 +688,7 @@ pipeline {
         booleanParam(name: 'TEST_RUN_TOX', defaultValue: false, description: 'Run Tox Tests')
         booleanParam(name: 'BUILD_PACKAGES', defaultValue: false, description: 'Build Python packages')
         booleanParam(name: 'TEST_PACKAGES', defaultValue: true, description: 'Test Python packages by installing them and running tests on the installed package')
-        // Unable to build on arm64 linux because conan is unable to build libcurl which is required by libmediainfo
-        // booleanParam(name: 'INCLUDE_LINUX_ARM', defaultValue: false, description: 'Include ARM architecture for Linux')
+        booleanParam(name: 'INCLUDE_LINUX_ARM', defaultValue: false, description: 'Include ARM architecture for Linux')
         booleanParam(name: 'INCLUDE_LINUX_X86_64', defaultValue: true, description: 'Include x86_64 architecture for Linux')
         booleanParam(name: 'INCLUDE_MACOS', defaultValue: false, description: 'Include ARM(m1) architecture for Mac')
         booleanParam(name: 'INCLUDE_MACOS_X86_64', defaultValue: false, description: 'Include x86_64 architecture for Mac')
@@ -1385,15 +1385,14 @@ pipeline {
                                         def selectedArches = []
                                         def allValidArches = [
                                             "x86_64",
-                                            // Arm is not current working, mediainfo requires libcurl which fails to build on ARM64
-                                            // "arm64"
+                                            "arm64"
                                         ]
                                         if(params.INCLUDE_LINUX_X86_64 == true){
                                             selectedArches << "x86_64"
                                         }
-//                                         if(params.INCLUDE_LINUX_ARM == true){
-//                                             selectedArches << "arm64"
-//                                         }
+                                        if(params.INCLUDE_LINUX_ARM == true){
+                                            selectedArches << "arm64"
+                                        }
                                         return allValidArches.collectEntries{ arch ->
                                             def newStageName = "Test sdist (Linux ${arch} - Python ${pythonVersion})"
                                             return [
