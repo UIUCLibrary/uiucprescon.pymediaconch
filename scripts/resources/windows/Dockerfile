@@ -74,12 +74,16 @@ ENV UV_FROZEN=1 `
     UV_PROJECT=c:/temp/project
 ARG DEV_ENV_ARGUMENTS
 ARG CONAN_CENTER_PROXY_V2_URL
+
+# NOTE: libcurl has to be built from source because the version on conan-center volatileaccessu.lib which requires a
+# newer version of windows.
+
 RUN uv run --only-group=build conan profile detect --exist-ok ; `
     if (${env:CONAN_CENTER_PROXY_V2_URL} -ne $(Get-Content -Raw -Path ${Env:CONAN_HOME}\remotes.json)) { `
           Copy-Item -Path "${Env:CONAN_HOME}\remotes.json" -Destination "c:\remotes.json" ; `
           uv run --only-group=build conan remote update conan-center --url ${env:CONAN_CENTER_PROXY_V2_URL}; `
     }; `
-    uv run --only-group=build conan install c:/temp/ --build missing -pr:b=default ; `
+    uv run --only-group=build conan install c:/temp/ --build missing --build libcurl/* -pr:b=default ; `
     if ($LASTEXITCODE -ne 0) { `
       throw \"Command 'conan install' failed with exit code: $LASTEXITCODE\"`
     } ;`
