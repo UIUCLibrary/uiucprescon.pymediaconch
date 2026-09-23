@@ -23,7 +23,11 @@ generate_wheel_with_uv(){
     local constraints=$4
     local arch=$5
 
-    MACOSX_DEPLOYMENT_TARGET='10.13'
+    if [ "$arch" == "x86_64" ]; then
+      MACOSX_DEPLOYMENT_TARGET='10.13'
+    else
+      MACOSX_DEPLOYMENT_TARGET='11.0'
+    fi
     out_temp_wheels_dir=$(mktemp -d /tmp/python_wheels.XXXXXX)
     output_path="./dist"
     trap 'rm -rf $out_temp_wheels_dir' ERR SIGINT SIGTERM RETURN

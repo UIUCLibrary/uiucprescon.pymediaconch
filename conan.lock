@@ -9,7 +9,7 @@
         "libxml2/2.13.8#06138534f18dd953b35cad0dc3a08451%1747039371.412",
         "libmediainfo/26.01#b45c51e3db1a7e6adc0ada795b9d00fd%1778681852.011",
         "libiconv/1.17#1e65319e945f2d31941a9d28cc13c058%1751451666.321",
-        "libcurl/8.15.0#f94d17d44efcc8d467e3bdd7e694a892%1755694467.056"
+        "libcurl/8.21.0#8c26e59c04891ba3373ea3552e18f67f%1783067699.863"
     ],
     "build_requires": [
         "strawberryperl/5.32.1.1#707032463aa0620fa17ec0d887f5fe41%1716912583.131",
@@ -22,10 +22,9 @@
         "m4/1.4.19#b38ced39a01e31fef5435bc634461fd2%1700758725.451",
         "libtool/2.4.7#14e7739cc128bc1623d2ed318008e47e%1755679003.847",
         "gnu-config/cci.20210814#69fde734e1a46fd1655b4af46ab40945%1746203214.947",
+        "cmake/4.1.2#71e7d1fe41e6c644d602c7e4bdbac291%1759423783.444",
         "automake/1.16.5#b91b7c384c3deaa9d535be02da14d04f%1755524470.56",
-        "autoconf/2.71#51077f068e61700d65bb05541ea1e4b0%1731054366.86",
-        "cmake/4.1.2#71e7d1fe41e6c644d602c7e4bdbac291%1759423783.444"
-
+        "autoconf/2.71#51077f068e61700d65bb05541ea1e4b0%1731054366.86"
     ],
     "python_requires": [],
     "config_requires": []
