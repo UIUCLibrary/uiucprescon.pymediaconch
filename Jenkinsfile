@@ -1071,11 +1071,13 @@ pipeline {
                                                  withEnv([
                                                     "UV_CONFIG_FILE=${createWindowUVConfig()}"]){
                                                      bat(script: 'python -m venv venv && venv\\Scripts\\pip install --disable-pip-version-check uv')
-                                                     envs = bat(
-                                                         label: 'Get tox environments',
-                                                         script: '@.\\venv\\Scripts\\uv run --frozen --quiet --only-group=tox --isolated tox list -d --no-desc --runner=virtualenv',
-                                                         returnStdout: true,
-                                                     ).trim().split('\r\n')
+                                                     retry(3){
+                                                         envs = bat(
+                                                             label: 'Get tox environments',
+                                                             script: '@.\\venv\\Scripts\\uv run --frozen --quiet --only-group=tox --isolated tox list -d --no-desc --runner=virtualenv',
+                                                             returnStdout: true,
+                                                         ).trim().split('\r\n')
+                                                     }
                                                  }
                                             }
                                          } finally{
