@@ -490,8 +490,8 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                             'UV_PYTHON_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvpython',
                                             'UV_CACHE_DIR=C:\\Users\\ContainerUser\\Documents\\uvcache',
                                         ]){
-                                            checkout scm
                                             try{
+                                                checkout scm
                                                 docker.image(env.DEFAULT_PYTHON_DOCKER_IMAGE ? env.DEFAULT_PYTHON_DOCKER_IMAGE: 'python').inside(
                                                     "--label=purpose=ci " +
                                                     "--label \"absoluteUrl=${currentBuild.absoluteUrl}\" " +
@@ -536,7 +536,20 @@ def get_windows_nonabi3_wheel_stages(pythonVersionsNonAbi3, testPackages, params
                                                     }
                                                 }
                                             } finally {
-                                                bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                                if(fileExists('.git')){
+                                                    bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                                } else {
+                                                    cleanWs(
+                                                        patterns: [
+                                                            [pattern: 'sample_files/', type: 'INCLUDE'],
+                                                            [pattern: 'dist/', type: 'INCLUDE'],
+                                                            [pattern: 'build/', type: 'INCLUDE'],
+                                                            [pattern: '**/__pycache__/', type: 'INCLUDE'],
+                                                        ],
+                                                        notFailBuild: true,
+                                                        deleteDirs: true
+                                                    )
+                                                }
                                             }
                                         }
                                     }
@@ -1092,13 +1105,13 @@ pipeline {
                                                  {
                                                      node('docker && windows'){
                                                         def image
-                                                        checkout scm
-                                                        lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
-                                                            retry(retryTimes){
-                                                                image = docker.build(UUID.randomUUID().toString(), '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci' +  (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
-                                                            }
-                                                        }
                                                         try{
+                                                            checkout scm
+                                                            lock("${env.JOB_NAME} - ${env.NODE_NAME}"){
+                                                                retry(retryTimes){
+                                                                    image = docker.build(UUID.randomUUID().toString(), '-f scripts/resources/windows/Dockerfile --build-arg UV_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci' +  (env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE ? " --build-arg FROM_IMAGE=${env.DEFAULT_DOCKER_DOTNET_SDK_BASE_IMAGE} ": ' ') + '.')
+                                                                }
+                                                            }
                                                             try{
                                                                 image.inside("--label=purpose=ci " +
                                                                              "--label \"absoluteUrl=${currentBuild.absoluteUrl}\" " +
@@ -1134,12 +1147,25 @@ pipeline {
                                                                         }
                                                                     }
                                                                 }
-                                                            } finally {
-                                                                bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                                            } finally{
+                                                                if (image){
+                                                                    bat "docker rmi --force --no-prune ${image.id}"
+                                                                }
                                                             }
-                                                        } finally{
-                                                            if (image){
-                                                                bat "docker rmi --force --no-prune ${image.id}"
+                                                        } finally {
+                                                            if(fileExists('.git')){
+                                                                bat "${tool(name: 'Default', type: 'git')} clean -dfx"
+                                                            } else {
+                                                                cleanWs(
+                                                                    patterns: [
+                                                                        [pattern: 'sample_files/', type: 'INCLUDE'],
+                                                                        [pattern: 'dist/', type: 'INCLUDE'],
+                                                                        [pattern: 'build/', type: 'INCLUDE'],
+                                                                        [pattern: '**/__pycache__/', type: 'INCLUDE'],
+                                                                    ],
+                                                                    notFailBuild: true,
+                                                                    deleteDirs: true
+                                                                )
                                                             }
                                                         }
                                                      }
