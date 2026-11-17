@@ -1433,8 +1433,10 @@ pipeline {
                                                                 try{
                                                                     try{
                                                                         checkout scm
-                                                                        lock("docker build-${env.NODE_NAME}"){
-                                                                            dockerImage = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci .')
+                                                                        retry(2){
+                                                                            lock("docker build-${env.NODE_NAME}"){
+                                                                                dockerImage = docker.build(UUID.randomUUID().toString(), '-f ci/docker/linux/tox/Dockerfile --build-arg PIP_INDEX_URL --build-arg CONAN_CENTER_PROXY_V2_URL --label=purpose=ci .')
+                                                                            }
                                                                         }
                                                                         withEnv([
                                                                             'PIP_CACHE_DIR=/tmp/pipcache',
